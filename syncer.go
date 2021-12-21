@@ -13,3 +13,27 @@
 // limitations under the License.
 
 package dsync
+
+type syncer struct {
+	storage StorageInterface
+}
+
+func (s *syncer) Add(uids ...UID) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *syncer) Del(uids ...UID) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *syncer) Manifest(uid UID) (Manifest, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *syncer) Data(manifest Manifest) (values []Item, err error) {
+	//TODO implement me
+	panic("implement me")
+}

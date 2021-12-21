@@ -17,10 +17,10 @@ package dsync
 // StorageInterface defines storage related interfaces
 type StorageInterface interface {
 	// Get gets data according to the specified key
-	Get(key []byte) (interface{}, error)
+	Get(key []byte) ([]byte, error)
 
 	// Add adds a set of key/value pairs
-	Add(key []byte, value interface{}) error
+	Add(key []byte, value []byte) error
 
 	// Del deletes key/value pairs according to the specified key
 	Del(key []byte) error
@@ -38,13 +38,13 @@ type Interface interface {
 // DataSet defines the data set operations
 type DataSet interface {
 	// Get gets data according to UID
-	Get(uid UID) (value interface{})
+	Get(uid UID) (*Item, error)
 
 	// Add adds data items
 	Add(items ...Item) error
 
-	// Del deletes data according to UID
-	Del(uid ...UID) error
+	// Del deletes data according to UIDs
+	Del(uids ...UID) error
 
 	// Sync syncs data according to manifest and items
 	Sync(Manifest, []Item) error
@@ -56,7 +56,7 @@ type Synchronizer interface {
 	Add(uids ...UID) error
 
 	// Del deletes UIDs from sync set
-	Del(uid ...UID) error
+	Del(uids ...UID) error
 
 	// Manifest gets a manifest that needs to be synchronized according to the UID
 	Manifest(uid UID) (Manifest, error)
@@ -68,9 +68,5 @@ type Synchronizer interface {
 // Item defines the data item
 type Item struct {
 	UID   UID
-	Value interface{}
-}
-
-func New() Interface {
-	return nil
+	Value []byte
 }
