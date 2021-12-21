@@ -14,8 +14,27 @@
 
 package dsync
 
+import "errors"
+
+var (
+	ErrDataNotMatch  = errors.New("data not match")
+	ErrUnexpectState = errors.New("unexpect state")
+)
+
 type dataSet struct {
 	storage StorageInterface
+}
+
+func (ds *dataSet) State() UID {
+	value, err := ds.storage.Get([]byte(keyState))
+	if err != nil {
+		return Nil
+	}
+	uid, err := BuildUIDFromBytes(value)
+	if err != nil {
+		return Nil
+	}
+	return uid
 }
 
 func (ds *dataSet) Get(uid UID) (*Item, error) {
@@ -48,6 +67,29 @@ func (ds *dataSet) Del(uids ...UID) error {
 }
 
 func (ds *dataSet) Sync(manifest Manifest, items []Item) error {
-	//TODO implement me
-	panic("implement me")
+	state := ds.State()
+	for i, iter := 0, manifest.Iter(); iter.Next(); i++ {
+		if i == 0 && state != Nil {
+			if state == iter.KSUID {
+				continue
+			}
+			return ErrUnexpectState
+		}
+
+		var exists bool
+		for _, item := range items {
+			if iter.KSUID != item.UID {
+				continue
+			}
+			if err := ds.Add(item); err != nil {
+				return err
+			}
+			exists = true
+			break
+		}
+		if !exists {
+			return ErrDataNotMatch
+		}
+	}
+	return nil
 }

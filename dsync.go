@@ -14,6 +14,11 @@
 
 package dsync
 
+const (
+	keyPrefix = "dsync_"
+	keyState  = keyPrefix + "state"
+)
+
 // StorageInterface defines storage related interfaces
 type StorageInterface interface {
 	// Get gets data according to the specified key
@@ -37,6 +42,7 @@ type Interface interface {
 
 // DataSet defines the data set operations
 type DataSet interface {
+	State() UID
 	// Get gets data according to UID
 	Get(uid UID) (*Item, error)
 
@@ -62,7 +68,7 @@ type Synchronizer interface {
 	Manifest(uid UID) (Manifest, error)
 
 	// Data gets the data items to be synchronized according to the manifest
-	Data(Manifest) (values []Item, err error)
+	Data(Manifest) ([]Item, error)
 }
 
 // Item defines the data item

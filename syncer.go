@@ -14,26 +14,106 @@
 
 package dsync
 
+import (
+	"errors"
+
+	"github.com/segmentio/ksuid"
+)
+
+var ErrNotFound = errors.New("uid not found")
+
 type syncer struct {
+	name    string
 	storage StorageInterface
 }
 
+func (s *syncer) buildKey() []byte {
+	return []byte(keyPrefix + s.name)
+}
+
+func (s *syncer) isExists(uids []UID, current UID) bool {
+	for _, uid := range uids {
+		if uid == current {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *syncer) Add(uids ...UID) error {
-	//TODO implement me
-	panic("implement me")
+	key := s.buildKey()
+	value, err := s.storage.Get(key)
+	if err != nil {
+		return err
+	}
+
+	manifest := ksuid.AppendCompressed(value, uids...)
+	return s.storage.Add(key, manifest)
 }
 
 func (s *syncer) Del(uids ...UID) error {
-	//TODO implement me
-	panic("implement me")
+	key := s.buildKey()
+	value, err := s.storage.Get(key)
+	if err != nil {
+		return err
+	}
+
+	var set []UID
+	manifest := Manifest(value)
+	for iter := manifest.Iter(); iter.Next(); {
+		current := iter.KSUID
+		if s.isExists(uids, current) {
+			continue
+		}
+		set = append(set, current)
+	}
+
+	manifest = ksuid.Compress(set...)
+	return s.storage.Add(key, manifest)
 }
 
 func (s *syncer) Manifest(uid UID) (Manifest, error) {
-	//TODO implement me
-	panic("implement me")
+	key := s.buildKey()
+	value, err := s.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		set    []UID
+		exists bool
+	)
+	manifest := Manifest(value)
+	for iter := manifest.Iter(); iter.Next(); {
+		current := iter.KSUID
+		if current == uid {
+			exists = true
+		}
+		if !exists {
+			continue
+		}
+		set = append(set, current)
+	}
+	if len(set) == 0 {
+		return manifest, ErrNotFound
+	}
+
+	manifest = ksuid.Compress(set...)
+	return manifest, nil
 }
 
-func (s *syncer) Data(manifest Manifest) (values []Item, err error) {
-	//TODO implement me
-	panic("implement me")
+func (s *syncer) Data(manifest Manifest) ([]Item, error) {
+	var items []Item
+	for iter := manifest.Iter(); iter.Next(); {
+		current := iter.KSUID
+		value, err := s.storage.Get(current.Bytes())
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, Item{
+			UID:   current,
+			Value: value,
+		})
+	}
+	return items, nil
 }

@@ -31,7 +31,10 @@ func (i *instance) DataSet() DataSet {
 }
 
 func (i *instance) Syncer(name string) Synchronizer {
-	return &syncer{storage: i.storage}
+	return &syncer{
+		name:    name,
+		storage: i.storage,
+	}
 }
 
 type Option func(i *instance)

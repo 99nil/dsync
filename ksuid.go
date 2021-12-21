@@ -26,10 +26,16 @@ type UID = ksuid.KSUID
 // Manifest defines a list of UIDs to be synchronized
 type Manifest = ksuid.CompressedSet
 
+// Nil represents a completely empty (invalid) UID
+var Nil UID
+
+// NewUID returns a new UID.
+// In the strange case that random bytes can't be read, it will panic.
 func NewUID() UID {
 	return ksuid.New()
 }
 
-func ParseUID(key []byte) (UID, error) {
+// BuildUIDFromBytes builds a UID from a 20-byte binary representation
+func BuildUIDFromBytes(key []byte) (UID, error) {
 	return ksuid.FromBytes(key)
 }
