@@ -29,3 +29,7 @@ type Manifest = ksuid.CompressedSet
 func NewUID() UID {
 	return ksuid.New()
 }
+
+func ParseUID(key []byte) (UID, error) {
+	return ksuid.FromBytes(key)
+}
