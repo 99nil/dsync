@@ -14,7 +14,11 @@
 
 package dsync
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/segmentio/ksuid"
+)
 
 var (
 	ErrDataNotMatch  = errors.New("data not match")
@@ -23,6 +27,10 @@ var (
 
 type dataSet struct {
 	storage StorageInterface
+}
+
+func (ds *dataSet) setState(uid UID) error {
+	return ds.storage.Add([]byte(keyState), uid.Bytes())
 }
 
 func (ds *dataSet) State() UID {
@@ -49,8 +57,21 @@ func (ds *dataSet) Get(uid UID) (*Item, error) {
 }
 
 func (ds *dataSet) Add(items ...Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	state := ds.State()
 	for _, item := range items {
-		if err := ds.storage.Add(item.UID.Bytes(), item.Value); err != nil {
+		key := item.UID.Bytes()
+		if err := ds.storage.Add(key, item.Value); err != nil {
+			return err
+		}
+
+		if ksuid.Compare(state, item.UID) > 0 {
+			continue
+		}
+		if err := ds.setState(item.UID); err != nil {
 			return err
 		}
 	}
