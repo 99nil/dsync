@@ -53,7 +53,7 @@ type DataSet interface {
 	Del(uids ...UID) error
 
 	// Sync syncs data according to manifest and items
-	Sync(Manifest, []Item) error
+	Sync(manifest Manifest, items []Item, callback func(Item) error) error
 }
 
 // Synchronizer defines the synchronizer operations

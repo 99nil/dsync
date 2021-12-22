@@ -87,7 +87,11 @@ func (ds *dataSet) Del(uids ...UID) error {
 	return nil
 }
 
-func (ds *dataSet) Sync(manifest Manifest, items []Item) error {
+func (ds *dataSet) Sync(manifest Manifest, items []Item, callback func(Item) error) error {
+	if len(items) == 0 {
+		return nil
+	}
+
 	state := ds.State()
 	for i, iter := 0, manifest.Iter(); iter.Next(); i++ {
 		if i == 0 && state != Nil {
@@ -104,6 +108,11 @@ func (ds *dataSet) Sync(manifest Manifest, items []Item) error {
 			}
 			if err := ds.Add(item); err != nil {
 				return err
+			}
+			if callback != nil {
+				if err := callback(item); err != nil {
+					return err
+				}
 			}
 			exists = true
 			break
