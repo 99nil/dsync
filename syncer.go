@@ -21,7 +21,10 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-var ErrNotFound = errors.New("uid not found")
+var (
+	ErrNotFound      = errors.New("uid not found")
+	ErrEmptyManifest = errors.New("empty manifest")
+)
 
 type syncer struct {
 	name    string
@@ -79,12 +82,19 @@ func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(value) == 0 {
+		return nil, ErrEmptyManifest
+	}
+
+	manifest := Manifest(value)
+	if uid == Nil {
+		return manifest, nil
+	}
 
 	var (
 		set    []UID
 		exists bool
 	)
-	manifest := Manifest(value)
 	for iter := manifest.Iter(); iter.Next(); {
 		current := iter.KSUID
 		if current == uid {
