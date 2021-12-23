@@ -15,6 +15,7 @@
 package dsync
 
 import (
+	"context"
 	"errors"
 
 	"github.com/segmentio/ksuid"
@@ -25,6 +26,13 @@ var ErrNotFound = errors.New("uid not found")
 type syncer struct {
 	name    string
 	storage StorageInterface
+}
+
+func newSyncer(name string, storage StorageInterface) *syncer {
+	return &syncer{
+		name:    name,
+		storage: storage,
+	}
 }
 
 func (s *syncer) buildKey() []byte {
@@ -40,20 +48,20 @@ func (s *syncer) isExists(uids []UID, current UID) bool {
 	return false
 }
 
-func (s *syncer) Add(uids ...UID) error {
+func (s *syncer) Add(ctx context.Context, uids ...UID) error {
 	key := s.buildKey()
-	value, err := s.storage.Get(syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, key)
 	if err != nil {
 		return err
 	}
 
 	manifest := ksuid.AppendCompressed(value, uids...)
-	return s.storage.Add(syncerSpace, key, manifest)
+	return s.storage.Add(ctx, syncerSpace, key, manifest)
 }
 
-func (s *syncer) Del(uids ...UID) error {
+func (s *syncer) Del(ctx context.Context, uids ...UID) error {
 	key := s.buildKey()
-	value, err := s.storage.Get(syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, key)
 	if err != nil {
 		return err
 	}
@@ -69,12 +77,12 @@ func (s *syncer) Del(uids ...UID) error {
 	}
 
 	manifest = ksuid.Compress(set...)
-	return s.storage.Add(syncerSpace, key, manifest)
+	return s.storage.Add(ctx, syncerSpace, key, manifest)
 }
 
-func (s *syncer) Manifest(uid UID) (Manifest, error) {
+func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 	key := s.buildKey()
-	value, err := s.storage.Get(syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, key)
 	if err != nil {
 		return nil, err
 	}
@@ -102,11 +110,11 @@ func (s *syncer) Manifest(uid UID) (Manifest, error) {
 	return manifest, nil
 }
 
-func (s *syncer) Data(manifest Manifest) ([]Item, error) {
+func (s *syncer) Data(ctx context.Context, manifest Manifest) ([]Item, error) {
 	var items []Item
 	for iter := manifest.Iter(); iter.Next(); {
 		current := iter.KSUID
-		value, err := s.storage.Get(dataSetSpace, current.Bytes())
+		value, err := s.storage.Get(ctx, dataSetSpace, current.Bytes())
 		if err != nil {
 			return nil, err
 		}

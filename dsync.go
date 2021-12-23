@@ -14,6 +14,8 @@
 
 package dsync
 
+import "context"
+
 const (
 	keyPrefix = "dsync_"
 	keyState  = keyPrefix + "state"
@@ -34,16 +36,16 @@ type KV struct {
 // StorageInterface defines storage related interfaces
 type StorageInterface interface {
 	// List lists all data in current space
-	List(space []byte) ([]KV, error)
+	List(ctx context.Context, space []byte) ([]KV, error)
 
 	// Get gets data according to the specified key in current space
-	Get(space, key []byte) ([]byte, error)
+	Get(ctx context.Context, space, key []byte) ([]byte, error)
 
 	// Add adds a set of key/value pairs in current space
-	Add(space, key, value []byte) error
+	Add(ctx context.Context, space, key, value []byte) error
 
 	// Del deletes key/value pairs according to the specified key in current space
-	Del(space, key []byte) error
+	Del(ctx context.Context, space, key []byte) error
 }
 
 // Interface defines dsync core
@@ -55,36 +57,38 @@ type Interface interface {
 	Syncer(name string) Synchronizer
 }
 
-// DataSet defines the data set operations
-type DataSet interface {
-	State() UID
-	// Get gets data according to UID
-	Get(uid UID) (*Item, error)
-
-	// Add adds data items
-	Add(items ...Item) error
-
-	// Del deletes data according to UIDs
-	Del(uids ...UID) error
-
-	// Sync syncs data according to manifest and items
-	Sync(manifest Manifest, items []Item, callback func(Item) error) error
-}
-
 // Synchronizer defines the synchronizer operations
 type Synchronizer interface {
 	// Add adds UIDs to sync set
-	Add(uids ...UID) error
+	Add(ctx context.Context, uids ...UID) error
 
 	// Del deletes UIDs from sync set
-	Del(uids ...UID) error
+	Del(ctx context.Context, uids ...UID) error
 
 	// Manifest gets a manifest that needs to be synchronized according to the UID
-	Manifest(uid UID) (Manifest, error)
+	Manifest(ctx context.Context, uid UID) (Manifest, error)
 
 	// Data gets the data items to be synchronized according to the manifest
-	Data(Manifest) ([]Item, error)
+	Data(ctx context.Context, manifest Manifest) ([]Item, error)
 }
+
+// DataSet defines the data set operations
+type DataSet interface {
+	State(ctx context.Context) UID
+	// Get gets data according to UID
+	Get(ctx context.Context, uid UID) (*Item, error)
+
+	// Add adds data items
+	Add(ctx context.Context, items ...Item) error
+
+	// Del deletes data according to UIDs
+	Del(ctx context.Context, uids ...UID) error
+
+	// Sync syncs data according to manifest and items
+	Sync(ctx context.Context, manifest Manifest, items []Item, callback ItemCallbackFunc) error
+}
+
+type ItemCallbackFunc func(context.Context, Item) error
 
 // Item defines the data item
 type Item struct {

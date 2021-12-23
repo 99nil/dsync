@@ -15,6 +15,7 @@
 package dsync
 
 import (
+	"context"
 	"errors"
 
 	"github.com/segmentio/ksuid"
@@ -29,12 +30,16 @@ type dataSet struct {
 	storage StorageInterface
 }
 
-func (ds *dataSet) setState(uid UID) error {
-	return ds.storage.Add(defaultSpace, []byte(keyState), uid.Bytes())
+func newDataSet(storage StorageInterface) *dataSet {
+	return &dataSet{storage: storage}
 }
 
-func (ds *dataSet) State() UID {
-	value, err := ds.storage.Get(defaultSpace, []byte(keyState))
+func (ds *dataSet) setState(ctx context.Context, uid UID) error {
+	return ds.storage.Add(ctx, defaultSpace, []byte(keyState), uid.Bytes())
+}
+
+func (ds *dataSet) State(ctx context.Context) UID {
+	value, err := ds.storage.Get(ctx, defaultSpace, []byte(keyState))
 	if err != nil {
 		return Nil
 	}
@@ -45,8 +50,8 @@ func (ds *dataSet) State() UID {
 	return uid
 }
 
-func (ds *dataSet) Get(uid UID) (*Item, error) {
-	value, err := ds.storage.Get(dataSetSpace, uid.Bytes())
+func (ds *dataSet) Get(ctx context.Context, uid UID) (*Item, error) {
+	value, err := ds.storage.Get(ctx, dataSetSpace, uid.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -56,39 +61,39 @@ func (ds *dataSet) Get(uid UID) (*Item, error) {
 	}, nil
 }
 
-func (ds *dataSet) Add(items ...Item) error {
+func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 	if len(items) == 0 {
 		return nil
 	}
 
-	state := ds.State()
+	state := ds.State(ctx)
 	for _, item := range items {
 		key := item.UID.Bytes()
-		if err := ds.storage.Add(dataSetSpace, key, item.Value); err != nil {
+		if err := ds.storage.Add(ctx, dataSetSpace, key, item.Value); err != nil {
 			return err
 		}
 
 		if ksuid.Compare(state, item.UID) > 0 {
 			continue
 		}
-		if err := ds.setState(item.UID); err != nil {
+		if err := ds.setState(ctx, item.UID); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (ds *dataSet) Del(uids ...UID) error {
+func (ds *dataSet) Del(ctx context.Context, uids ...UID) error {
 	for _, uid := range uids {
-		if err := ds.storage.Del(dataSetSpace, uid.Bytes()); err != nil {
+		if err := ds.storage.Del(ctx, dataSetSpace, uid.Bytes()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (ds *dataSet) tmpList() ([]Item, error) {
-	list, err := ds.storage.List(dataSetTmpSpace)
+func (ds *dataSet) tmpList(ctx context.Context) ([]Item, error) {
+	list, err := ds.storage.List(ctx, dataSetTmpSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +112,7 @@ func (ds *dataSet) tmpList() ([]Item, error) {
 	return items, nil
 }
 
-func (ds *dataSet) Sync(manifest Manifest, items []Item, callback func(Item) error) error {
+func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, callback ItemCallbackFunc) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -115,18 +120,18 @@ func (ds *dataSet) Sync(manifest Manifest, items []Item, callback func(Item) err
 	// Store items in tmp space first,
 	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
 	for _, item := range items {
-		if err := ds.storage.Add(dataSetTmpSpace, item.UID.Bytes(), item.Value); err != nil {
+		if err := ds.storage.Add(ctx, dataSetTmpSpace, item.UID.Bytes(), item.Value); err != nil {
 			return err
 		}
 	}
 
 	// Take out all the items in the tmp space and start synchronization.
-	list, err := ds.tmpList()
+	list, err := ds.tmpList(ctx)
 	if err != nil {
 		return err
 	}
 
-	state := ds.State()
+	state := ds.State(ctx)
 	for i, iter := 0, manifest.Iter(); iter.Next(); i++ {
 		current := iter.KSUID
 		if i == 0 && state != Nil {
@@ -141,11 +146,11 @@ func (ds *dataSet) Sync(manifest Manifest, items []Item, callback func(Item) err
 			if current != item.UID {
 				continue
 			}
-			if err := ds.Add(item); err != nil {
+			if err := ds.Add(ctx, item); err != nil {
 				return err
 			}
 			if callback != nil {
-				if err := callback(item); err != nil {
+				if err := callback(ctx, item); err != nil {
 					return err
 				}
 			}
@@ -154,7 +159,7 @@ func (ds *dataSet) Sync(manifest Manifest, items []Item, callback func(Item) err
 			// Try to delete the synchronized data in the tmp space.
 			// If the deletion fails, no verification is required,
 			// and it can be reclaimed by the GC later.
-			_ = ds.storage.Del(dataSetTmpSpace, item.UID.Bytes())
+			_ = ds.storage.Del(ctx, dataSetTmpSpace, item.UID.Bytes())
 			break
 		}
 		if !exists {

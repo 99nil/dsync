@@ -27,14 +27,11 @@ type instance struct {
 }
 
 func (i *instance) DataSet() DataSet {
-	return &dataSet{storage: i.storage}
+	return newDataSet(i.storage)
 }
 
 func (i *instance) Syncer(name string) Synchronizer {
-	return &syncer{
-		name:    name,
-		storage: i.storage,
-	}
+	return newSyncer(name, i.storage)
 }
 
 type Option func(i *instance)
