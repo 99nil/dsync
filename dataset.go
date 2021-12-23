@@ -99,7 +99,7 @@ func (ds *dataSet) tmpList(ctx context.Context) ([]Item, error) {
 
 	var items []Item
 	for _, v := range list {
-		uid, err := BuildUIDFromBytes(v.Key)
+		uid, err := BuildUID(string(v.Key))
 		if err != nil {
 			return nil, err
 		}
