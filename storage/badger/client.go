@@ -30,6 +30,10 @@ func New(cfg *Config) (*Client, error) {
 	return client, nil
 }
 
+func (c *Client) Close() error {
+	return c.db.Close()
+}
+
 func (c *Client) GC() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
