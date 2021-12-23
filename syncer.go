@@ -35,10 +35,6 @@ func newSyncer(name string, storage StorageInterface) *syncer {
 	}
 }
 
-func (s *syncer) buildKey() []byte {
-	return []byte(s.name)
-}
-
 func (s *syncer) isExists(uids []UID, current UID) bool {
 	for _, uid := range uids {
 		if uid == current {
@@ -49,19 +45,17 @@ func (s *syncer) isExists(uids []UID, current UID) bool {
 }
 
 func (s *syncer) Add(ctx context.Context, uids ...UID) error {
-	key := s.buildKey()
-	value, err := s.storage.Get(ctx, syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, s.name)
 	if err != nil {
 		return err
 	}
 
 	manifest := ksuid.AppendCompressed(value, uids...)
-	return s.storage.Add(ctx, syncerSpace, key, manifest)
+	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
 }
 
 func (s *syncer) Del(ctx context.Context, uids ...UID) error {
-	key := s.buildKey()
-	value, err := s.storage.Get(ctx, syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, s.name)
 	if err != nil {
 		return err
 	}
@@ -77,12 +71,11 @@ func (s *syncer) Del(ctx context.Context, uids ...UID) error {
 	}
 
 	manifest = ksuid.Compress(set...)
-	return s.storage.Add(ctx, syncerSpace, key, manifest)
+	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
 }
 
 func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
-	key := s.buildKey()
-	value, err := s.storage.Get(ctx, syncerSpace, key)
+	value, err := s.storage.Get(ctx, syncerSpace, s.name)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +107,7 @@ func (s *syncer) Data(ctx context.Context, manifest Manifest) ([]Item, error) {
 	var items []Item
 	for iter := manifest.Iter(); iter.Next(); {
 		current := iter.KSUID
-		value, err := s.storage.Get(ctx, dataSetSpace, current.Bytes())
+		value, err := s.storage.Get(ctx, dataSetSpace, current.String())
 		if err != nil {
 			return nil, err
 		}

@@ -9,6 +9,8 @@ import (
 	"github.com/dgraph-io/badger/v3"
 )
 
+var _ dsync.StorageInterface = (*Client)(nil)
+
 type Config struct {
 	Path string `json:"path"`
 }
@@ -52,7 +54,7 @@ func (c *Client) GC() {
 	}()
 }
 
-func (c *Client) Get(_ context.Context, space, key []byte) ([]byte, error) {
+func (c *Client) Get(_ context.Context, space, key string) ([]byte, error) {
 	var res []byte
 	err := c.db.View(func(txn *badger.Txn) error {
 		prefix := buildPrefix(space)
@@ -69,21 +71,21 @@ func (c *Client) Get(_ context.Context, space, key []byte) ([]byte, error) {
 	return res, err
 }
 
-func (c *Client) Add(_ context.Context, space, key, value []byte) error {
+func (c *Client) Add(_ context.Context, space, key string, value []byte) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
 		return txn.Set(fmtKey, value)
 	})
 }
 
-func (c *Client) Del(_ context.Context, space, key []byte) error {
+func (c *Client) Del(_ context.Context, space, key string) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
 		return txn.Delete(fmtKey)
 	})
 }
 
-func (c *Client) List(_ context.Context, space []byte) ([]dsync.KV, error) {
+func (c *Client) List(_ context.Context, space string) ([]dsync.KV, error) {
 	var res []dsync.KV
 	err := c.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -107,6 +109,6 @@ func (c *Client) List(_ context.Context, space []byte) ([]dsync.KV, error) {
 	return res, err
 }
 
-func buildPrefix(space []byte) []byte {
-	return append(space, '-')
+func buildPrefix(space string) []byte {
+	return append([]byte(space), '-')
 }

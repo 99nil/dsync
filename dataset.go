@@ -35,11 +35,11 @@ func newDataSet(storage StorageInterface) *dataSet {
 }
 
 func (ds *dataSet) setState(ctx context.Context, uid UID) error {
-	return ds.storage.Add(ctx, defaultSpace, []byte(keyState), uid.Bytes())
+	return ds.storage.Add(ctx, defaultSpace, keyState, uid.Bytes())
 }
 
 func (ds *dataSet) State(ctx context.Context) UID {
-	value, err := ds.storage.Get(ctx, defaultSpace, []byte(keyState))
+	value, err := ds.storage.Get(ctx, defaultSpace, keyState)
 	if err != nil {
 		return Nil
 	}
@@ -51,7 +51,7 @@ func (ds *dataSet) State(ctx context.Context) UID {
 }
 
 func (ds *dataSet) Get(ctx context.Context, uid UID) (*Item, error) {
-	value, err := ds.storage.Get(ctx, dataSetSpace, uid.Bytes())
+	value, err := ds.storage.Get(ctx, dataSetSpace, uid.String())
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +68,7 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 
 	state := ds.State(ctx)
 	for _, item := range items {
-		key := item.UID.Bytes()
-		if err := ds.storage.Add(ctx, dataSetSpace, key, item.Value); err != nil {
+		if err := ds.storage.Add(ctx, dataSetSpace, item.UID.String(), item.Value); err != nil {
 			return err
 		}
 
@@ -85,7 +84,7 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 
 func (ds *dataSet) Del(ctx context.Context, uids ...UID) error {
 	for _, uid := range uids {
-		if err := ds.storage.Del(ctx, dataSetSpace, uid.Bytes()); err != nil {
+		if err := ds.storage.Del(ctx, dataSetSpace, uid.String()); err != nil {
 			return err
 		}
 	}
@@ -120,7 +119,7 @@ func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, ca
 	// Store items in tmp space first,
 	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
 	for _, item := range items {
-		if err := ds.storage.Add(ctx, dataSetTmpSpace, item.UID.Bytes(), item.Value); err != nil {
+		if err := ds.storage.Add(ctx, dataSetTmpSpace, item.UID.String(), item.Value); err != nil {
 			return err
 		}
 	}
@@ -159,7 +158,7 @@ func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, ca
 			// Try to delete the synchronized data in the tmp space.
 			// If the deletion fails, no verification is required,
 			// and it can be reclaimed by the GC later.
-			_ = ds.storage.Del(ctx, dataSetTmpSpace, item.UID.Bytes())
+			_ = ds.storage.Del(ctx, dataSetTmpSpace, item.UID.String())
 			break
 		}
 		if !exists {

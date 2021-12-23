@@ -10,6 +10,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+var _ dsync.StorageInterface = (*Client)(nil)
+
 type Config struct {
 	Path string `json:"path"`
 }
@@ -44,7 +46,7 @@ func New(cfg *Config) (*Client, error) {
 	return &Client{db: db}, err
 }
 
-func (c *Client) Get(ctx context.Context, space, key []byte) ([]byte, error) {
+func (c *Client) Get(ctx context.Context, space, key string) ([]byte, error) {
 	var res []byte
 	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("SELECT `value` FROM %s WHERE `uid`=? AND `space`=?", dataTable))
 	defer stmt.Close()
@@ -57,7 +59,7 @@ func (c *Client) Get(ctx context.Context, space, key []byte) ([]byte, error) {
 	return res, nil
 }
 
-func (c *Client) Add(ctx context.Context, space, key, value []byte) error {
+func (c *Client) Add(ctx context.Context, space, key string, value []byte) error {
 	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?)", dataTable))
 	defer stmt.Close()
 	if err != nil {
@@ -69,7 +71,7 @@ func (c *Client) Add(ctx context.Context, space, key, value []byte) error {
 	return nil
 }
 
-func (c *Client) Del(ctx context.Context, space, key []byte) error {
+func (c *Client) Del(ctx context.Context, space, key string) error {
 	if len(key) == 0 || len(space) == 0 {
 		return fmt.Errorf("key or space must not be null")
 	}
@@ -84,7 +86,7 @@ func (c *Client) Del(ctx context.Context, space, key []byte) error {
 	return nil
 }
 
-func (c *Client) List(ctx context.Context, space []byte) ([]dsync.KV, error) {
+func (c *Client) List(ctx context.Context, space string) ([]dsync.KV, error) {
 	var res []dsync.KV
 	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("SELECT `uid`,`value` FROM %s WHERE `space`=?", dataTable))
 	defer stmt.Close()

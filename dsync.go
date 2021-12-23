@@ -21,11 +21,11 @@ const (
 	keyState  = keyPrefix + "state"
 )
 
-var (
-	defaultSpace    = []byte("dsync")
-	syncerSpace     = []byte(keyPrefix + "syncer")
-	dataSetTmpSpace = []byte(keyPrefix + "dataset_tmp")
-	dataSetSpace    = []byte(keyPrefix + "dataset")
+const (
+	defaultSpace    = "dsync"
+	syncerSpace     = keyPrefix + "syncer"
+	dataSetTmpSpace = keyPrefix + "dataset_tmp"
+	dataSetSpace    = keyPrefix + "dataset"
 )
 
 type KV struct {
@@ -36,16 +36,16 @@ type KV struct {
 // StorageInterface defines storage related interfaces
 type StorageInterface interface {
 	// List lists all data in current space
-	List(ctx context.Context, space []byte) ([]KV, error)
+	List(ctx context.Context, space string) ([]KV, error)
 
 	// Get gets data according to the specified key in current space
-	Get(ctx context.Context, space, key []byte) ([]byte, error)
+	Get(ctx context.Context, space, key string) ([]byte, error)
 
 	// Add adds a set of key/value pairs in current space
-	Add(ctx context.Context, space, key, value []byte) error
+	Add(ctx context.Context, space, key string, value []byte) error
 
 	// Del deletes key/value pairs according to the specified key in current space
-	Del(ctx context.Context, space, key []byte) error
+	Del(ctx context.Context, space, key string) error
 }
 
 // Interface defines dsync core
