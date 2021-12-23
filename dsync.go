@@ -74,6 +74,9 @@ type Synchronizer interface {
 
 // DataSet defines the data set operations
 type DataSet interface {
+	// SetState ...
+	SetState(ctx context.Context, uid UID) error
+	// State ...
 	State(ctx context.Context) UID
 	// Get gets data according to UID
 	Get(ctx context.Context, uid UID) (*Item, error)

@@ -34,7 +34,7 @@ func newDataSet(storage StorageInterface) *dataSet {
 	return &dataSet{storage: storage}
 }
 
-func (ds *dataSet) setState(ctx context.Context, uid UID) error {
+func (ds *dataSet) SetState(ctx context.Context, uid UID) error {
 	return ds.storage.Add(ctx, defaultSpace, keyState, []byte(uid.String()))
 }
 
@@ -75,7 +75,7 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 		if ksuid.Compare(state, item.UID) > 0 {
 			continue
 		}
-		if err := ds.setState(ctx, item.UID); err != nil {
+		if err := ds.SetState(ctx, item.UID); err != nil {
 			return err
 		}
 	}
