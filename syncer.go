@@ -28,7 +28,7 @@ type syncer struct {
 }
 
 func (s *syncer) buildKey() []byte {
-	return []byte(keyPrefix + s.name)
+	return []byte(s.name)
 }
 
 func (s *syncer) isExists(uids []UID, current UID) bool {
@@ -42,18 +42,18 @@ func (s *syncer) isExists(uids []UID, current UID) bool {
 
 func (s *syncer) Add(uids ...UID) error {
 	key := s.buildKey()
-	value, err := s.storage.Get(key)
+	value, err := s.storage.Get(syncerSpace, key)
 	if err != nil {
 		return err
 	}
 
 	manifest := ksuid.AppendCompressed(value, uids...)
-	return s.storage.Add(key, manifest)
+	return s.storage.Add(syncerSpace, key, manifest)
 }
 
 func (s *syncer) Del(uids ...UID) error {
 	key := s.buildKey()
-	value, err := s.storage.Get(key)
+	value, err := s.storage.Get(syncerSpace, key)
 	if err != nil {
 		return err
 	}
@@ -69,12 +69,12 @@ func (s *syncer) Del(uids ...UID) error {
 	}
 
 	manifest = ksuid.Compress(set...)
-	return s.storage.Add(key, manifest)
+	return s.storage.Add(syncerSpace, key, manifest)
 }
 
 func (s *syncer) Manifest(uid UID) (Manifest, error) {
 	key := s.buildKey()
-	value, err := s.storage.Get(key)
+	value, err := s.storage.Get(syncerSpace, key)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (s *syncer) Data(manifest Manifest) ([]Item, error) {
 	var items []Item
 	for iter := manifest.Iter(); iter.Next(); {
 		current := iter.KSUID
-		value, err := s.storage.Get(current.Bytes())
+		value, err := s.storage.Get(dataSetSpace, current.Bytes())
 		if err != nil {
 			return nil, err
 		}
