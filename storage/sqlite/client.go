@@ -21,7 +21,8 @@ type Client struct {
 }
 
 type data struct {
-	Key   []byte `gorm:"primary_key;column:uid;type:varchar(40);not null"`
+	ID    int    `gorm:"primary_key;column:id;type:integer;not null"`
+	Key   []byte `gorm:"column:uid;type:varchar(40);not null"`
 	Space []byte `gorm:"column:space;type:varchar(20);not null"`
 	Value []byte `gorm:"column:value;type:text"`
 }
@@ -38,7 +39,7 @@ func New(cfg *Config) (*Client, error) {
 			return nil, err
 		}
 		if _, err = db.Exec(
-			fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` (`uid` VARCHAR(40) PRIMARY KEY, `space` VARCHAR(20) NOT NULL, `value` TEXT)",
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` (`id` INTEGER AUTOINCREMENT PRIMARY KEY , `uid` VARCHAR(40) NOT NULL, `space` VARCHAR(20) NOT NULL, `value` TEXT)",
 				dataTable)); err != nil {
 			return nil, err
 		}
