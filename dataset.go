@@ -35,7 +35,7 @@ func newDataSet(storage StorageInterface) *dataSet {
 }
 
 func (ds *dataSet) setState(ctx context.Context, uid UID) error {
-	return ds.storage.Add(ctx, defaultSpace, keyState, uid.Bytes())
+	return ds.storage.Add(ctx, defaultSpace, keyState, []byte(uid.String()))
 }
 
 func (ds *dataSet) State(ctx context.Context) UID {
@@ -43,7 +43,7 @@ func (ds *dataSet) State(ctx context.Context) UID {
 	if err != nil {
 		return Nil
 	}
-	uid, err := BuildUIDFromBytes(value)
+	uid, err := BuildUID(string(value))
 	if err != nil {
 		return Nil
 	}
