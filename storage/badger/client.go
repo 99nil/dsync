@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"context"
 	"time"
 
 	"github.com/99nil/dsync"
@@ -47,7 +48,7 @@ func (c *Client) GC() {
 	}()
 }
 
-func (c *Client) Get(space, key []byte) ([]byte, error) {
+func (c *Client) Get(_ context.Context, space, key []byte) ([]byte, error) {
 	var res []byte
 	err := c.db.View(func(txn *badger.Txn) error {
 		prefix := buildPrefix(space)
@@ -64,21 +65,21 @@ func (c *Client) Get(space, key []byte) ([]byte, error) {
 	return res, err
 }
 
-func (c *Client) Add(space, key, value []byte) error {
+func (c *Client) Add(_ context.Context, space, key, value []byte) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
 		return txn.Set(fmtKey, value)
 	})
 }
 
-func (c *Client) Del(space, key []byte) error {
+func (c *Client) Del(_ context.Context, space, key []byte) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
 		return txn.Delete(fmtKey)
 	})
 }
 
-func (c *Client) List(space []byte) ([]dsync.KV, error) {
+func (c *Client) List(_ context.Context, space []byte) ([]dsync.KV, error) {
 	var res []dsync.KV
 	err := c.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)

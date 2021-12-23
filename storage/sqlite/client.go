@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -43,54 +44,54 @@ func New(cfg *Config) (*Client, error) {
 	return &Client{db: db}, err
 }
 
-func (c *Client) Get(space, key []byte) ([]byte, error) {
+func (c *Client) Get(ctx context.Context, space, key []byte) ([]byte, error) {
 	var res []byte
-	stmt, err := c.db.Prepare(fmt.Sprintf("SELECT `value` FROM %s WHERE `uid`=? AND `space`=?", dataTable))
+	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("SELECT `value` FROM %s WHERE `uid`=? AND `space`=?", dataTable))
 	defer stmt.Close()
 	if err != nil {
 		return nil, err
 	}
-	if err = stmt.QueryRow(key, space).Scan(&res); err != nil {
+	if err = stmt.QueryRowContext(ctx, key, space).Scan(&res); err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
-func (c *Client) Add(space, key, value []byte) error {
-	stmt, err := c.db.Prepare(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?)", dataTable))
+func (c *Client) Add(ctx context.Context, space, key, value []byte) error {
+	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?)", dataTable))
 	defer stmt.Close()
 	if err != nil {
 		return err
 	}
-	if _, err = stmt.Exec(key, space, value); err != nil {
+	if _, err = stmt.ExecContext(ctx, key, space, value); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) Del(space, key []byte) error {
+func (c *Client) Del(ctx context.Context, space, key []byte) error {
 	if len(key) == 0 || len(space) == 0 {
 		return fmt.Errorf("key or space must not be null")
 	}
-	stmt, err := c.db.Prepare(fmt.Sprintf("DELETE FROM %s WHERE `uid`=? AND `space`=?", dataTable))
+	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE `uid`=? AND `space`=?", dataTable))
 	defer stmt.Close()
 	if err != nil {
 		return err
 	}
-	if _, err = stmt.Exec(key, space); err != nil {
+	if _, err = stmt.ExecContext(ctx, key, space); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) List(space []byte) ([]dsync.KV, error) {
+func (c *Client) List(ctx context.Context, space []byte) ([]dsync.KV, error) {
 	var res []dsync.KV
-	stmt, err := c.db.Prepare(fmt.Sprintf("SELECT `uid`,`value` FROM %s WHERE `space`=?", dataTable))
+	stmt, err := c.db.PrepareContext(ctx, fmt.Sprintf("SELECT `uid`,`value` FROM %s WHERE `space`=?", dataTable))
 	defer stmt.Close()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query(space)
+	rows, err := stmt.QueryContext(ctx, space)
 	if err != nil {
 		return nil, err
 	}
