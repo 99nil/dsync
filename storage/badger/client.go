@@ -94,7 +94,7 @@ func (c *Client) List(_ context.Context, space string) ([]dsync.KV, error) {
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 			current := dsync.KV{
-				Key: item.Key(),
+				Key: parsePrefix(item.Key(), prefix),
 			}
 			if err := item.Value(func(v []byte) error {
 				current.Value = v
@@ -111,4 +111,8 @@ func (c *Client) List(_ context.Context, space string) ([]dsync.KV, error) {
 
 func buildPrefix(space string) []byte {
 	return append([]byte(space), '-')
+}
+
+func parsePrefix(src, prefix []byte) []byte {
+	return src[len(prefix):]
 }
