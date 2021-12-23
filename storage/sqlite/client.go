@@ -38,7 +38,7 @@ func New(cfg *Config) (*Client, error) {
 			return nil, err
 		}
 		if _, err = db.Exec(
-			fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` (`uid` BLOB(40) PRIMARY KEY, `space` VARCHAR(20) NOT NULL, `value` TEXT)",
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` (`uid` VARCHAR(40) PRIMARY KEY, `space` VARCHAR(20) NOT NULL, `value` TEXT)",
 				dataTable)); err != nil {
 			return nil, err
 		}
