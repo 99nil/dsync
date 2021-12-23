@@ -159,7 +159,6 @@ func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, ca
 			// If the deletion fails, no verification is required,
 			// and it can be reclaimed by the GC later.
 			_ = ds.storage.Del(ctx, dataSetTmpSpace, item.UID.String())
-			break
 		}
 		if !exists {
 			return ErrDataNotMatch
