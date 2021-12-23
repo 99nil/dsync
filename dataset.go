@@ -31,6 +31,7 @@ type dataSet struct {
 	storage  StorageInterface
 	mux      sync.Mutex
 	manifest Manifest
+	state    UID
 }
 
 func newDataSet(storage StorageInterface) *dataSet {
@@ -38,19 +39,29 @@ func newDataSet(storage StorageInterface) *dataSet {
 }
 
 func (ds *dataSet) SetState(ctx context.Context, uid UID) error {
-	return ds.storage.Add(ctx, defaultSpace, keyState, []byte(uid.String()))
+	if err := ds.storage.Add(ctx, defaultSpace, keyState, []byte(uid.String())); err != nil {
+		return err
+	}
+	ds.state = uid
+	return nil
 }
 
 func (ds *dataSet) State(ctx context.Context) UID {
+	if ds.state != Nil {
+		return ds.state
+	}
+
 	value, err := ds.storage.Get(ctx, defaultSpace, keyState)
 	if err != nil {
-		return Nil
+		return ds.state
 	}
+
 	uid, err := BuildUID(string(value))
 	if err != nil {
-		return Nil
+		return ds.state
 	}
-	return uid
+	ds.state = uid
+	return ds.state
 }
 
 func (ds *dataSet) Get(ctx context.Context, uid UID) (*Item, error) {
@@ -75,7 +86,7 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 			return err
 		}
 
-		if ksuid.Compare(state, item.UID) > 0 {
+		if ksuid.Compare(state, item.UID) > -1 {
 			continue
 		}
 		if err := ds.SetState(ctx, item.UID); err != nil {
@@ -164,29 +175,42 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		return err
 	}
 
+	var match bool
 	for i, iter := 0, ds.manifest.Iter(); iter.Next(); i++ {
 		current := iter.KSUID
-		if i == 0 && state != Nil {
+		state := ds.State(ctx)
+
+		// When state is Nil, directly synchronize data
+		if state == Nil {
+			match = true
+		}
+
+		if !match {
+			// When the corresponding state is found in the manifest,
+			// start synchronization from the next.
 			if state == current {
-				continue
+				match = true
 			}
-			return ErrUnexpectState
+			continue
 		}
 
 		var exists bool
 		for _, item := range list {
-			if current != item.UID {
-				continue
-			}
-			if err := ds.Add(ctx, item); err != nil {
-				return err
-			}
-			if callback != nil {
-				if err := callback(ctx, item); err != nil {
+			if current == item.UID {
+				if err := ds.Add(ctx, item); err != nil {
 					return err
 				}
+				if callback != nil {
+					if err := callback(ctx, item); err != nil {
+						return err
+					}
+				}
+				exists = true
 			}
-			exists = true
+
+			if ksuid.Compare(current, item.UID) > -1 {
+				continue
+			}
 
 			// Try to delete the synchronized data in the tmp space.
 			// If the deletion fails, no verification is required,
