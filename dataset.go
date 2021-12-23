@@ -17,6 +17,7 @@ package dsync
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/segmentio/ksuid"
 )
@@ -27,7 +28,9 @@ var (
 )
 
 type dataSet struct {
-	storage StorageInterface
+	storage  StorageInterface
+	mux      sync.Mutex
+	manifest Manifest
 }
 
 func newDataSet(storage StorageInterface) *dataSet {
@@ -111,18 +114,49 @@ func (ds *dataSet) tmpList(ctx context.Context) ([]Item, error) {
 	return items, nil
 }
 
-func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, callback ItemCallbackFunc) error {
+func (ds *dataSet) SyncManifest(ctx context.Context, manifest Manifest) {
+	ds.mux.Lock()
+	defer ds.mux.Unlock()
+
+	state := ds.State(ctx)
+	if state != Nil {
+		var set []UID
+		for iter := manifest.Iter(); iter.Next(); {
+			if iter.KSUID == state {
+				set = append(set, iter.KSUID)
+			}
+		}
+		manifest = ksuid.Compress(set...)
+	}
+	ds.manifest = manifest
+}
+
+func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallbackFunc) error {
 	if len(items) == 0 {
 		return nil
 	}
+	state := ds.State(ctx)
 
+	var count int
 	// Store items in tmp space first,
 	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
 	for _, item := range items {
+		if ksuid.Compare(state, item.UID) > -1 {
+			continue
+		}
 		if err := ds.storage.Add(ctx, dataSetTmpSpace, item.UID.String(), item.Value); err != nil {
 			return err
 		}
+		count++
 	}
+	if count == 0 {
+		return nil
+	}
+
+	// In order to prevent the memory overflow caused by blocking,
+	// lock before obtaining the data item to be synchronized in the tmp space.
+	ds.mux.Lock()
+	defer ds.mux.Unlock()
 
 	// Take out all the items in the tmp space and start synchronization.
 	list, err := ds.tmpList(ctx)
@@ -130,8 +164,7 @@ func (ds *dataSet) Sync(ctx context.Context, manifest Manifest, items []Item, ca
 		return err
 	}
 
-	state := ds.State(ctx)
-	for i, iter := 0, manifest.Iter(); iter.Next(); i++ {
+	for i, iter := 0, ds.manifest.Iter(); iter.Next(); i++ {
 		current := iter.KSUID
 		if i == 0 && state != Nil {
 			if state == current {

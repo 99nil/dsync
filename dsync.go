@@ -74,10 +74,12 @@ type Synchronizer interface {
 
 // DataSet defines the data set operations
 type DataSet interface {
-	// SetState ...
+	// SetState sets the latest state of the dataset
 	SetState(ctx context.Context, uid UID) error
-	// State ...
+
+	// State gets the latest state of the dataset
 	State(ctx context.Context) UID
+
 	// Get gets data according to UID
 	Get(ctx context.Context, uid UID) (*Item, error)
 
@@ -87,8 +89,11 @@ type DataSet interface {
 	// Del deletes data according to UIDs
 	Del(ctx context.Context, uids ...UID) error
 
+	// SyncManifest syncs the manifest that needs to be executed
+	SyncManifest(ctx context.Context, manifest Manifest)
+
 	// Sync syncs data according to manifest and items
-	Sync(ctx context.Context, manifest Manifest, items []Item, callback ItemCallbackFunc) error
+	Sync(ctx context.Context, items []Item, callback ItemCallbackFunc) error
 }
 
 type ItemCallbackFunc func(context.Context, Item) error
@@ -98,3 +103,6 @@ type Item struct {
 	UID   UID
 	Value []byte
 }
+
+// TODO GC
+// TODO Clear
