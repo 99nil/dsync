@@ -131,9 +131,15 @@ func (ds *dataSet) SyncManifest(ctx context.Context, manifest Manifest) {
 
 	state := ds.State(ctx)
 	if state != Nil {
-		var set []UID
+		var (
+			set    []UID
+			exists bool
+		)
 		for iter := manifest.Iter(); iter.Next(); {
 			if iter.KSUID == state {
+				exists = true
+			}
+			if exists {
 				set = append(set, iter.KSUID)
 			}
 		}
