@@ -95,17 +95,19 @@ func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 		set    []UID
 		exists bool
 	)
+	manifest = ksuid.AppendCompressed(manifest, uid)
 	for iter := manifest.Iter(); iter.Next(); {
-		current := iter.KSUID
-		if current == uid {
+		if iter.KSUID == uid {
 			exists = true
 		}
 		if !exists {
 			continue
 		}
-		set = append(set, current)
+		set = append(set, iter.KSUID)
 	}
-	if len(set) == 0 {
+
+	// If there is none or only uid itself, there is nothing to synchronize.
+	if len(set) < 2 {
 		return manifest, ErrNotFound
 	}
 
