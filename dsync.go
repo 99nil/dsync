@@ -26,7 +26,14 @@ const (
 	syncerSpace     = keyPrefix + "syncer"
 	dataSetTmpSpace = keyPrefix + "dataset_tmp"
 	dataSetSpace    = keyPrefix + "dataset"
+	customSpace     = keyPrefix + "custom"
 )
+
+// Item defines the data item
+type Item struct {
+	UID   UID
+	Value []byte
+}
 
 type KV struct {
 	Key   []byte
@@ -98,12 +105,84 @@ type DataSet interface {
 
 type ItemCallbackFunc func(context.Context, Item) error
 
-// Item defines the data item
-type Item struct {
+// Customizer defines the custom data set operations
+type Customizer interface {
+	// SetState sets the latest state of the dataset
+	SetState(ctx context.Context, key string) error
+
+	// State gets the latest state of the dataset
+	State(ctx context.Context) string
+
+	// Get gets data according to custom key
+	Get(ctx context.Context, key string) (*CustomItem, error)
+
+	// Add adds data items
+	Add(ctx context.Context, items ...CustomItem) error
+
+	// Del deletes data according to UIDs
+	Del(ctx context.Context, keys ...string) error
+}
+
+type CustomItem struct {
+	Key   string
 	UID   UID
 	Value []byte
 }
 
-// TODO GC
-// TODO Clear
-// TODO Custom Key
+func NewCustomItem(key string, value []byte) *CustomItem {
+	return &CustomItem{
+		UID:   NewUID(),
+		Key:   key,
+		Value: value,
+	}
+}
+
+// CustomInterface defines custom dsync core
+type CustomInterface interface {
+	// DataSet returns a custom data set
+	DataSet() CustomDataSet
+
+	// Syncer returns a custom synchronizer with a specified name
+	Syncer(name string) CustomSynchronizer
+}
+
+type CustomSynchronizer interface {
+	// Add adds keys to sync set
+	Add(ctx context.Context, keys ...string) error
+
+	// Del deletes keys from sync set
+	Del(ctx context.Context, keys ...string) error
+
+	// Manifest gets a manifest that needs to be synchronized according to the UID
+	Manifest(ctx context.Context, uid UID) (*CustomManifest, error)
+
+	// Data gets the data items to be synchronized according to the manifest
+	Data(ctx context.Context, manifest *CustomManifest) ([]CustomItem, error)
+}
+
+type CustomDataSet interface {
+	// SetState sets the latest state of the dataset
+	SetState(ctx context.Context, uid UID) error
+
+	// State gets the latest state of the dataset
+	State(ctx context.Context) UID
+
+	// Get gets data according to custom key
+	Get(ctx context.Context, key string) (*CustomItem, error)
+
+	// Add adds custom data items
+	Add(ctx context.Context, items ...CustomItem) error
+
+	// Del deletes data according to custom keys
+	Del(ctx context.Context, keys ...string) error
+
+	// SyncManifest syncs the manifest that needs to be executed
+	SyncManifest(ctx context.Context, manifest Manifest)
+
+	// Sync syncs data according to manifest and items
+	Sync(ctx context.Context, items []CustomItem, callback CustomItemCallbackFunc) error
+}
+
+type CustomItemCallbackFunc func(context.Context, CustomItem) error
+
+type CustomManifest map[string]UID

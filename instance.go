@@ -14,16 +14,24 @@
 
 package dsync
 
+type Option func(i *instance)
+
+func WithStorageOption(storage StorageInterface) Option {
+	return func(i *instance) {
+		i.storage = storage
+	}
+}
+
+type instance struct {
+	storage StorageInterface
+}
+
 func New(opts ...Option) Interface {
 	ins := &instance{}
 	for _, opt := range opts {
 		opt(ins)
 	}
 	return ins
-}
-
-type instance struct {
-	storage StorageInterface
 }
 
 func (i *instance) DataSet() DataSet {
@@ -34,10 +42,22 @@ func (i *instance) Syncer(name string) Synchronizer {
 	return newSyncer(name, i.storage)
 }
 
-type Option func(i *instance)
+type customInstance struct {
+	ins *instance
+}
 
-func WithStorage(storage StorageInterface) Option {
-	return func(i *instance) {
-		i.storage = storage
+func NewCustom(opts ...Option) CustomInterface {
+	ins := &instance{}
+	for _, opt := range opts {
+		opt(ins)
 	}
+	return &customInstance{ins: ins}
+}
+
+func (i *customInstance) DataSet() CustomDataSet {
+	return newCustomDataSet(i.ins.storage, i.ins.DataSet())
+}
+
+func (i *customInstance) Syncer(name string) CustomSynchronizer {
+	return newCustomSyncer(i.ins.storage, i.ins.Syncer(name))
 }

@@ -32,10 +32,7 @@ type syncer struct {
 }
 
 func newSyncer(name string, storage StorageInterface) *syncer {
-	return &syncer{
-		name:    name,
-		storage: storage,
-	}
+	return &syncer{name: name, storage: storage}
 }
 
 func (s *syncer) isExists(uids []UID, current UID) bool {
