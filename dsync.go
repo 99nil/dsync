@@ -106,3 +106,4 @@ type Item struct {
 
 // TODO GC
 // TODO Clear
+// TODO Custom Key

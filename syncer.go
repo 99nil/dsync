@@ -77,6 +77,10 @@ func (s *syncer) Del(ctx context.Context, uids ...UID) error {
 	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
 }
 
+func (s *syncer) setManifest(ctx context.Context, manifest Manifest) error {
+	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
+}
+
 func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 	value, err := s.storage.Get(ctx, syncerSpace, s.name)
 	if err != nil {
@@ -108,10 +112,14 @@ func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 
 	// If there is none or only uid itself, there is nothing to synchronize.
 	if len(set) < 2 {
-		return manifest, ErrNotFound
+		_ = s.setManifest(ctx, nil)
+		return nil, ErrEmptyManifest
 	}
 
 	manifest = ksuid.Compress(set...)
+	if err := s.setManifest(ctx, manifest); err != nil {
+		return nil, err
+	}
 	return manifest, nil
 }
 
