@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/99nil/dsync"
-
 	"github.com/dgraph-io/badger/v3"
+
+	"github.com/99nil/dsync"
 )
 
 var _ dsync.StorageInterface = (*Client)(nil)
@@ -85,34 +85,6 @@ func (c *Client) Del(_ context.Context, space, key string) error {
 	})
 }
 
-func (c *Client) List(_ context.Context, space string) ([]dsync.KV, error) {
-	var res []dsync.KV
-	err := c.db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		prefix := buildPrefix(space)
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			item := it.Item()
-			current := dsync.KV{
-				Key: parsePrefix(item.Key(), prefix),
-			}
-			if err := item.Value(func(v []byte) error {
-				current.Value = v
-				res = append(res, current)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return res, err
-}
-
 func buildPrefix(space string) []byte {
 	return append([]byte(space), '-')
-}
-
-func parsePrefix(src, prefix []byte) []byte {
-	return src[len(prefix):]
 }

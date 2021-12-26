@@ -14,6 +14,20 @@
 
 package dsync
 
+func New(opts ...Option) Interface {
+	ins := newInstance(opts...)
+	ins.dataSet = newDataSet(ins.name, ins.storage)
+	return ins
+}
+
+func NewCustom(opts ...Option) CustomInterface {
+	ins := newInstance(opts...)
+	name := buildName("custom", ins.name)
+	customIns := &customInstance{name: name, storage: ins.storage}
+	customIns.dataSet = newCustomDataSet(customIns.name, customIns.storage)
+	return customIns
+}
+
 type Option func(i *instance)
 
 func WithStorageOption(storage StorageInterface) Option {
@@ -22,11 +36,19 @@ func WithStorageOption(storage StorageInterface) Option {
 	}
 }
 
-type instance struct {
-	storage StorageInterface
+func WithNameOption(name string) Option {
+	return func(i *instance) {
+		i.name = name
+	}
 }
 
-func New(opts ...Option) Interface {
+type instance struct {
+	name    string
+	storage StorageInterface
+	dataSet DataSet
+}
+
+func newInstance(opts ...Option) *instance {
 	ins := &instance{}
 	for _, opt := range opts {
 		opt(ins)
@@ -35,29 +57,23 @@ func New(opts ...Option) Interface {
 }
 
 func (i *instance) DataSet() DataSet {
-	return newDataSet(i.storage)
+	return i.dataSet
 }
 
 func (i *instance) Syncer(name string) Synchronizer {
-	return newSyncer(name, i.storage)
+	return newSyncer(i.name, name, i.storage)
 }
 
 type customInstance struct {
-	ins *instance
-}
-
-func NewCustom(opts ...Option) CustomInterface {
-	ins := &instance{}
-	for _, opt := range opts {
-		opt(ins)
-	}
-	return &customInstance{ins: ins}
+	name    string
+	storage StorageInterface
+	dataSet CustomDataSet
 }
 
 func (i *customInstance) DataSet() CustomDataSet {
-	return newCustomDataSet(i.ins.storage, i.ins.DataSet())
+	return i.dataSet
 }
 
 func (i *customInstance) Syncer(name string) CustomSynchronizer {
-	return newCustomSyncer(name, i.ins.storage, i.ins.Syncer(name))
+	return newCustomSyncer(i.name, name, i.storage)
 }

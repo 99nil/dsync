@@ -35,9 +35,9 @@ func NewUID() UID {
 	return ksuid.New()
 }
 
-// BuildUIDFromBytes builds a UID from a 20-byte binary representation
+// BuildUIDFromBytes builds a UID from a string bytes
 func BuildUIDFromBytes(key []byte) (UID, error) {
-	return ksuid.FromBytes(key)
+	return BuildUID(string(key))
 }
 
 // BuildUID builds a UID from string

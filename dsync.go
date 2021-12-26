@@ -14,24 +14,14 @@
 
 package dsync
 
-import "context"
-
-const (
-	keyPrefix = "dsync_"
-	keyState  = keyPrefix + "state"
+import (
+	"context"
+	"strings"
 )
 
-const (
-	defaultSpace = "dsync"
-	syncerSpace  = keyPrefix + "syncer"
-	dataSetSpace = keyPrefix + "dataset"
+const prefix = "dsync"
 
-	customSyncerSpace = syncerSpace + "_custom"
-
-	customDataSetSpace    = dataSetSpace + "_custom"
-	tmpDataSetSpace       = dataSetSpace + "_tmp"
-	customTmpDataSetSpace = dataSetSpace + "_custom_tmp"
-)
+const keyState = "dsync_state"
 
 // Item defines the data item
 type Item struct {
@@ -46,9 +36,6 @@ type KV struct {
 
 // StorageInterface defines storage related interfaces
 type StorageInterface interface {
-	// List lists all data in current space
-	List(ctx context.Context, space string) ([]KV, error)
-
 	// Get gets data according to the specified key in current space
 	Get(ctx context.Context, space, key string) ([]byte, error)
 
@@ -108,24 +95,6 @@ type DataSet interface {
 }
 
 type ItemCallbackFunc func(context.Context, Item) error
-
-// Customizer defines the custom data set operations
-type Customizer interface {
-	// SetState sets the latest state of the dataset
-	SetState(ctx context.Context, key string) error
-
-	// State gets the latest state of the dataset
-	State(ctx context.Context) string
-
-	// Get gets data according to custom key
-	Get(ctx context.Context, key string) (*CustomItem, error)
-
-	// Add adds data items
-	Add(ctx context.Context, items ...CustomItem) error
-
-	// Del deletes data according to UIDs
-	Del(ctx context.Context, keys ...string) error
-}
 
 type CustomItem struct {
 	Key   string
@@ -190,3 +159,23 @@ type CustomDataSet interface {
 type CustomItemCallbackFunc func(context.Context, CustomItem) error
 
 type CustomManifest map[string]UID
+
+func (cm CustomManifest) reverse() map[UID]string {
+	result := make(map[UID]string, len(cm))
+	for k, v := range cm {
+		result[v] = k
+	}
+	return result
+}
+
+func buildName(ss ...string) string {
+	nameSet := make([]string, 0, len(ss))
+	for _, s := range ss {
+		current := strings.TrimSpace(s)
+		if current == "" {
+			continue
+		}
+		nameSet = append(nameSet, current)
+	}
+	return strings.Join(nameSet, "_")
+}

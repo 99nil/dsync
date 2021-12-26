@@ -16,23 +16,27 @@ package dsync
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/segmentio/ksuid"
 )
 
 var (
-	ErrNotFound      = errors.New("uid not found")
 	ErrEmptyManifest = errors.New("empty manifest")
 )
 
 type syncer struct {
-	name    string
-	storage StorageInterface
+	name             string
+	syncerOperation  OperateInterface
+	dataSetOperation OperateInterface
 }
 
-func newSyncer(name string, storage StorageInterface) *syncer {
-	return &syncer{name: name, storage: storage}
+func newSyncer(insName string, name string, storage StorageInterface) *syncer {
+	s := &syncer{name: name}
+	s.syncerOperation = newSpaceOperation(buildName(prefix, "syncer", insName), storage)
+	s.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
+	return s
 }
 
 func (s *syncer) isExists(uids []UID, current UID) bool {
@@ -45,17 +49,17 @@ func (s *syncer) isExists(uids []UID, current UID) bool {
 }
 
 func (s *syncer) Add(ctx context.Context, uids ...UID) error {
-	value, err := s.storage.Get(ctx, syncerSpace, s.name)
+	value, err := s.syncerOperation.Get(ctx, s.name)
 	if err != nil {
 		return err
 	}
 
 	manifest := ksuid.AppendCompressed(value, uids...)
-	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
+	return s.syncerOperation.Add(ctx, s.name, manifest)
 }
 
 func (s *syncer) Del(ctx context.Context, uids ...UID) error {
-	value, err := s.storage.Get(ctx, syncerSpace, s.name)
+	value, err := s.syncerOperation.Get(ctx, s.name)
 	if err != nil {
 		return err
 	}
@@ -71,15 +75,15 @@ func (s *syncer) Del(ctx context.Context, uids ...UID) error {
 	}
 
 	manifest = ksuid.Compress(set...)
-	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
+	return s.syncerOperation.Add(ctx, s.name, manifest)
 }
 
 func (s *syncer) setManifest(ctx context.Context, manifest Manifest) error {
-	return s.storage.Add(ctx, syncerSpace, s.name, manifest)
+	return s.syncerOperation.Add(ctx, s.name, manifest)
 }
 
 func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
-	value, err := s.storage.Get(ctx, syncerSpace, s.name)
+	value, err := s.syncerOperation.Get(ctx, s.name)
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +127,182 @@ func (s *syncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
 func (s *syncer) Data(ctx context.Context, manifest Manifest) ([]Item, error) {
 	var items []Item
 	for iter := manifest.Iter(); iter.Next(); {
-		current := iter.KSUID
-		value, err := s.storage.Get(ctx, dataSetSpace, current.String())
+		value, err := s.dataSetOperation.Get(ctx, iter.KSUID.String())
 		if err != nil {
 			return nil, err
 		}
 		items = append(items, Item{
+			UID:   iter.KSUID,
+			Value: value,
+		})
+	}
+	return items, nil
+}
+
+type customSyncer struct {
+	name             string
+	syncerOperation  OperateInterface
+	dataSetOperation OperateInterface
+	customOperation  OperateInterface
+}
+
+func newCustomSyncer(insName string, name string, storage StorageInterface) CustomSynchronizer {
+	s := &customSyncer{name: name}
+	s.syncerOperation = newSpaceOperation(buildName(prefix, "syncer", insName), storage)
+	s.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
+	s.customOperation = newSpaceOperation(buildName(prefix, "custom", insName), storage)
+	return s
+}
+
+func (s *customSyncer) getKeyMap(ctx context.Context, keys ...string) (map[string]UID, error) {
+	keyMap := make(map[string]UID)
+	for _, key := range keys {
+		value, err := s.customOperation.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		uid, err := BuildUIDFromBytes(value)
+		if err != nil {
+			return nil, err
+		}
+		keyMap[key] = uid
+	}
+	return keyMap, nil
+}
+
+func (s *customSyncer) getCustomManifest(ctx context.Context) (CustomManifest, error) {
+	value, err := s.syncerOperation.Get(ctx, s.name)
+	if err != nil {
+		return nil, err
+	}
+	var customManifest CustomManifest
+	if err := json.Unmarshal(value, &customManifest); err != nil {
+		return nil, err
+	}
+	return customManifest, nil
+}
+
+func (s *customSyncer) setManifest(ctx context.Context, customManifest map[string]UID) error {
+	b, err := json.Marshal(customManifest)
+	if err != nil {
+		return err
+	}
+	return s.syncerOperation.Add(ctx, s.name, b)
+}
+
+func (s *customSyncer) Add(ctx context.Context, keys ...string) error {
+	keyMap, err := s.getKeyMap(ctx, keys...)
+	if err != nil {
+		return err
+	}
+	if len(keyMap) == 0 {
+		return nil
+	}
+
+	customManifest, err := s.getCustomManifest(ctx)
+	if err != nil {
+		return err
+	}
+
+	for key, uid := range keyMap {
+		customManifest[key] = uid
+	}
+	return s.setManifest(ctx, customManifest)
+}
+
+func (s *customSyncer) Del(ctx context.Context, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	customManifest, err := s.getCustomManifest(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, key := range keys {
+		delete(customManifest, key)
+	}
+	return s.setManifest(ctx, customManifest)
+}
+
+func (s *customSyncer) Manifest(ctx context.Context, uid UID) (Manifest, error) {
+	customManifest, err := s.getCustomManifest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(customManifest) == 0 {
+		return nil, ErrEmptyManifest
+	}
+
+	var manifest Manifest
+	for _, v := range customManifest {
+		manifest = ksuid.AppendCompressed(manifest, v)
+	}
+	if uid == Nil {
+		return manifest, nil
+	}
+
+	reverse := customManifest.reverse()
+	customManifest = make(map[string]UID)
+
+	var (
+		set    []UID
+		exists bool
+	)
+	manifest = ksuid.AppendCompressed(manifest, uid)
+	for iter := manifest.Iter(); iter.Next(); {
+		if iter.KSUID == uid {
+			exists = true
+		}
+		if !exists {
+			continue
+		}
+
+		key, ok := reverse[iter.KSUID]
+		if !ok {
+			return nil, ErrUnexpectState
+		}
+		customManifest[key] = iter.KSUID
+		set = append(set, iter.KSUID)
+	}
+
+	// If there is none or only uid itself, there is nothing to synchronize.
+	if len(set) < 2 {
+		_ = s.setManifest(ctx, nil)
+		return nil, ErrEmptyManifest
+	}
+	if err := s.setManifest(ctx, customManifest); err != nil {
+		return nil, err
+	}
+	manifest = ksuid.Compress(set...)
+	return manifest, nil
+}
+
+func (s *customSyncer) Data(ctx context.Context, manifest Manifest) ([]CustomItem, error) {
+	customManifest, err := s.getCustomManifest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(customManifest) == 0 {
+		return nil, nil
+	}
+
+	reverse := customManifest.reverse()
+
+	items := make([]CustomItem, 0, len(reverse))
+	for iter := manifest.Iter(); iter.Next(); {
+		current := iter.KSUID
+		key, ok := reverse[current]
+		if !ok {
+			continue
+		}
+
+		value, err := s.dataSetOperation.Get(ctx, current.String())
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, CustomItem{
+			Key:   key,
 			UID:   current,
 			Value: value,
 		})
