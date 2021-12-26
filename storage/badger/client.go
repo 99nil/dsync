@@ -5,11 +5,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
-
-	"github.com/99nil/dsync"
 )
-
-var _ dsync.StorageInterface = (*Client)(nil)
 
 type Config struct {
 	Path string `json:"path"`
