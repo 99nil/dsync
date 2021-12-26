@@ -105,26 +105,6 @@ func (ds *dataSet) Del(ctx context.Context, uids ...UID) error {
 	return nil
 }
 
-func (ds *dataSet) tmpList(ctx context.Context) ([]Item, error) {
-	list, err := ds.storage.List(ctx, dataSetTmpSpace)
-	if err != nil {
-		return nil, err
-	}
-
-	var items []Item
-	for _, v := range list {
-		uid, err := BuildUID(string(v.Key))
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, Item{
-			UID:   uid,
-			Value: v.Value,
-		})
-	}
-	return items, nil
-}
-
 func (ds *dataSet) SyncManifest(ctx context.Context, manifest Manifest) {
 	ds.mux.Lock()
 	defer ds.mux.Unlock()
@@ -161,7 +141,7 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		if ksuid.Compare(state, item.UID) > -1 {
 			continue
 		}
-		if err := ds.storage.Add(ctx, dataSetTmpSpace, item.UID.String(), item.Value); err != nil {
+		if err := ds.storage.Add(ctx, tmpDataSetSpace, item.UID.String(), item.Value); err != nil {
 			return err
 		}
 		count++
@@ -170,16 +150,10 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		return nil
 	}
 
-	// In order to prevent the memory overflow caused by blocking,
-	// lock before obtaining the data item to be synchronized in the tmp space.
+	// In order to ensure the consistency of the manifest,
+	// it needs to be locked before this.
 	ds.mux.Lock()
 	defer ds.mux.Unlock()
-
-	// Take out all the items in the tmp space and start synchronization.
-	list, err := ds.tmpList(ctx)
-	if err != nil {
-		return err
-	}
 
 	var match bool
 	for i, iter := 0, ds.manifest.Iter(); iter.Next(); i++ {
@@ -200,32 +174,28 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 			continue
 		}
 
-		var exists bool
-		for _, item := range list {
-			if current == item.UID {
-				if err := ds.Add(ctx, item); err != nil {
-					return err
-				}
-				if callback != nil {
-					if err := callback(ctx, item); err != nil {
-						return err
-					}
-				}
-				exists = true
-			}
-
-			if ksuid.Compare(current, item.UID) > -1 {
-				continue
-			}
-
-			// Try to delete the synchronized data in the tmp space.
-			// If the deletion fails, no verification is required,
-			// and it can be reclaimed by the GC later.
-			_ = ds.storage.Del(ctx, dataSetTmpSpace, item.UID.String())
+		value, err := ds.storage.Get(ctx, tmpDataSetSpace, current.String())
+		if err != nil {
+			return err
 		}
-		if !exists {
+		if value == nil {
 			return ErrDataNotMatch
 		}
+
+		item := Item{UID: current, Value: value}
+		if err := ds.Add(ctx, item); err != nil {
+			return err
+		}
+		if callback != nil {
+			if err := callback(ctx, item); err != nil {
+				return err
+			}
+		}
+
+		// Try to delete the synchronized data in the tmp space.
+		// If the deletion fails, no verification is required,
+		// and it can be reclaimed by the GC later.
+		_ = ds.storage.Del(ctx, tmpDataSetSpace, current.String())
 	}
 	return nil
 }

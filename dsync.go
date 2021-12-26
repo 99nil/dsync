@@ -22,11 +22,15 @@ const (
 )
 
 const (
-	defaultSpace    = "dsync"
-	syncerSpace     = keyPrefix + "syncer"
-	dataSetTmpSpace = keyPrefix + "dataset_tmp"
-	dataSetSpace    = keyPrefix + "dataset"
-	customSpace     = keyPrefix + "custom"
+	defaultSpace = "dsync"
+	syncerSpace  = keyPrefix + "syncer"
+	dataSetSpace = keyPrefix + "dataset"
+
+	customSyncerSpace = syncerSpace + "_custom"
+
+	customDataSetSpace    = dataSetSpace + "_custom"
+	tmpDataSetSpace       = dataSetSpace + "_tmp"
+	customTmpDataSetSpace = dataSetSpace + "_custom_tmp"
 )
 
 // Item defines the data item
@@ -154,10 +158,10 @@ type CustomSynchronizer interface {
 	Del(ctx context.Context, keys ...string) error
 
 	// Manifest gets a manifest that needs to be synchronized according to the UID
-	Manifest(ctx context.Context, uid UID) (*CustomManifest, error)
+	Manifest(ctx context.Context, uid UID) (Manifest, error)
 
 	// Data gets the data items to be synchronized according to the manifest
-	Data(ctx context.Context, manifest *CustomManifest) ([]CustomItem, error)
+	Data(ctx context.Context, manifest Manifest) ([]CustomItem, error)
 }
 
 type CustomDataSet interface {

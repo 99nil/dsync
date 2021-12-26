@@ -59,5 +59,5 @@ func (i *customInstance) DataSet() CustomDataSet {
 }
 
 func (i *customInstance) Syncer(name string) CustomSynchronizer {
-	return newCustomSyncer(i.ins.storage, i.ins.Syncer(name))
+	return newCustomSyncer(name, i.ins.storage, i.ins.Syncer(name))
 }
