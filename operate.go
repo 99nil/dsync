@@ -17,6 +17,8 @@ package dsync
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/99nil/dsync/storage"
 )
 
 type OperateInterface interface {
@@ -29,10 +31,10 @@ type OperateInterface interface {
 
 type spaceOperation struct {
 	name    string
-	storage StorageInterface
+	storage storage.Interface
 }
 
-func newSpaceOperation(name string, storage StorageInterface) OperateInterface {
+func newSpaceOperation(name string, storage storage.Interface) OperateInterface {
 	return &spaceOperation{name: name, storage: storage}
 }
 

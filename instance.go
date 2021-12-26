@@ -14,6 +14,8 @@
 
 package dsync
 
+import "github.com/99nil/dsync/storage"
+
 func New(opts ...Option) Interface {
 	ins := newInstance(opts...)
 	ins.dataSet = newDataSet(ins.name, ins.storage)
@@ -30,7 +32,7 @@ func NewCustom(opts ...Option) CustomInterface {
 
 type Option func(i *instance)
 
-func WithStorageOption(storage StorageInterface) Option {
+func WithStorageOption(storage storage.Interface) Option {
 	return func(i *instance) {
 		i.storage = storage
 	}
@@ -44,7 +46,7 @@ func WithNameOption(name string) Option {
 
 type instance struct {
 	name    string
-	storage StorageInterface
+	storage storage.Interface
 	dataSet DataSet
 }
 
@@ -66,7 +68,7 @@ func (i *instance) Syncer(name string) Synchronizer {
 
 type customInstance struct {
 	name    string
-	storage StorageInterface
+	storage storage.Interface
 	dataSet CustomDataSet
 }
 

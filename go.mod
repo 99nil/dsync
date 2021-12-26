@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/dgraph-io/badger/v3 v3.2103.2
-	github.com/mattn/go-sqlite3 v1.14.9
 	github.com/segmentio/ksuid v1.0.4
 )
 

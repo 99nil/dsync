@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/99nil/dsync/storage"
+
 	"github.com/segmentio/ksuid"
 )
 
@@ -32,7 +34,7 @@ type syncer struct {
 	dataSetOperation OperateInterface
 }
 
-func newSyncer(insName string, name string, storage StorageInterface) *syncer {
+func newSyncer(insName string, name string, storage storage.Interface) *syncer {
 	s := &syncer{name: name}
 	s.syncerOperation = newSpaceOperation(buildName(prefix, "syncer", insName), storage)
 	s.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
@@ -146,7 +148,7 @@ type customSyncer struct {
 	customOperation  OperateInterface
 }
 
-func newCustomSyncer(insName string, name string, storage StorageInterface) CustomSynchronizer {
+func newCustomSyncer(insName string, name string, storage storage.Interface) CustomSynchronizer {
 	s := &customSyncer{name: name}
 	s.syncerOperation = newSpaceOperation(buildName(prefix, "syncer", insName), storage)
 	s.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)

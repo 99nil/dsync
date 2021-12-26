@@ -29,23 +29,6 @@ type Item struct {
 	Value []byte
 }
 
-type KV struct {
-	Key   []byte
-	Value []byte
-}
-
-// StorageInterface defines storage related interfaces
-type StorageInterface interface {
-	// Get gets data according to the specified key in current space
-	Get(ctx context.Context, space, key string) ([]byte, error)
-
-	// Add adds a set of key/value pairs in current space
-	Add(ctx context.Context, space, key string, value []byte) error
-
-	// Del deletes key/value pairs according to the specified key in current space
-	Del(ctx context.Context, space, key string) error
-}
-
 // Interface defines dsync core
 type Interface interface {
 	// DataSet returns a data set

@@ -1,11 +1,30 @@
+// Copyright © 2021 zc2638 <zc2638@qq.com>.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package badger
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/99nil/dsync/storage"
 
 	"github.com/dgraph-io/badger/v3"
 )
+
+var _ storage.Interface = (*Client)(nil)
 
 type Config struct {
 	Path string `json:"path"`
@@ -16,6 +35,7 @@ type Client struct {
 }
 
 func New(cfg *Config) (*Client, error) {
+	var err error
 	options := badger.DefaultOptions(cfg.Path)
 	options.Logger = nil
 	options.BypassLockGuard = true
@@ -25,6 +45,14 @@ func New(cfg *Config) (*Client, error) {
 	}
 	client := &Client{db: db}
 	client.GC()
+	return client, nil
+}
+
+func NewWithDB(db *badger.DB) (*Client, error) {
+	if db == nil {
+		return nil, errors.New("db unavailable")
+	}
+	client := &Client{db: db}
 	return client, nil
 }
 
@@ -48,6 +76,10 @@ func (c *Client) GC() {
 			}
 		}
 	}()
+}
+
+func buildPrefix(space string) []byte {
+	return append([]byte(space), '-')
 }
 
 func (c *Client) Get(_ context.Context, space, key string) ([]byte, error) {
@@ -81,6 +113,13 @@ func (c *Client) Del(_ context.Context, space, key string) error {
 	})
 }
 
-func buildPrefix(space string) []byte {
-	return append([]byte(space), '-')
+func (c *Client) Iterator() storage.Iterator {
+	iter := NewClientIterator(nil)
+	err := c.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		iter = NewClientIterator(it)
+		return nil
+	})
+	iter.err = err
+	return iter
 }

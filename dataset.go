@@ -20,6 +20,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/99nil/dsync/storage"
+
 	"github.com/segmentio/ksuid"
 )
 
@@ -38,7 +40,7 @@ type dataSet struct {
 	tmpOperation     OperateInterface
 }
 
-func newDataSet(insName string, storage StorageInterface) *dataSet {
+func newDataSet(insName string, storage storage.Interface) *dataSet {
 	ds := new(dataSet)
 	ds.defaultOperation = newSpaceOperation(buildName(prefix, insName), storage)
 	ds.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
@@ -221,7 +223,7 @@ type customDataSet struct {
 	customOperation  OperateInterface
 }
 
-func newCustomDataSet(insName string, storage StorageInterface) *customDataSet {
+func newCustomDataSet(insName string, storage storage.Interface) *customDataSet {
 	ds := new(customDataSet)
 	ds.defaultOperation = newSpaceOperation(buildName(prefix, insName), storage)
 	ds.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
