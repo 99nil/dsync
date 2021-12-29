@@ -33,6 +33,8 @@ func NewManifestFromBytes(b []byte) (*AssembleManifest, error) {
 	return manifest, nil
 }
 
+var sep = []byte("...")
+
 // AssembleManifest defines a list of UIDs to be synchronized
 type AssembleManifest struct {
 	cs  ksuid.CompressedSet
@@ -95,13 +97,13 @@ func (am *AssembleManifest) Bytes() ([]byte, error) {
 	}
 	out := make([]byte, 0, len(am.cs)+len(b)+1)
 	out = append(out, am.cs...)
-	out = append(out, Separator...)
+	out = append(out, sep...)
 	out = append(out, b...)
 	return out, nil
 }
 
 func (am *AssembleManifest) FromBytes(b []byte) error {
-	bytesSet := bytes.SplitN(b, Separator, 2)
+	bytesSet := bytes.SplitN(b, sep, 2)
 	if len(bytesSet[0]) > 0 {
 		am.cs = bytesSet[0]
 	}
