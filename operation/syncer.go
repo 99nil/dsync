@@ -12,4 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dsync
+package operation
+
+import (
+	"context"
+
+	"github.com/99nil/dsync/suid"
+)
+
+// dataset init时，在一个 init_dataset 空间中初始化数据，中间所有的add/del操作都保留
+// init 完成后，覆盖 dataset 空间
+
+// dataset add/del时，调用 syncer 的 add/del 操作
+// 新的syncer创建时，调用 syncer 的 init 操作
+
+type SyncerOperation interface {
+	Init() error
+	Add(ctx context.Context, uids ...suid.UID) error
+	Del(ctx context.Context, uids ...suid.UID) error
+}

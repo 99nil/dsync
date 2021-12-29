@@ -14,16 +14,21 @@
 
 package dsync
 
-// StorageInterface defines storage related interfaces
-type StorageInterface interface {
-	// Get gets data according to the specified key
-	Get(key []byte) (interface{}, error)
+import (
+	"context"
+	"strings"
 
-	// Add adds a set of key/value pairs
-	Add(key []byte, value interface{}) error
+	"github.com/99nil/dsync/suid"
+)
 
-	// Del deletes key/value pairs according to the specified key
-	Del(key []byte) error
+const prefix = "dsync"
+
+const keyState = "dsync_state"
+
+// Item defines the data item
+type Item struct {
+	UID   suid.UID
+	Value []byte
 }
 
 // Interface defines dsync core
@@ -35,42 +40,58 @@ type Interface interface {
 	Syncer(name string) Synchronizer
 }
 
-// DataSet defines the data set operations
-type DataSet interface {
-	// Get gets data according to UID
-	Get(uid UID) (value interface{})
-
-	// Add adds data items
-	Add(items ...Item) error
-
-	// Del deletes data according to UID
-	Del(uid ...UID) error
-
-	// Sync syncs data according to manifest and items
-	Sync(Manifest, []Item) error
-}
-
 // Synchronizer defines the synchronizer operations
 type Synchronizer interface {
 	// Add adds UIDs to sync set
-	Add(uids ...UID) error
+	Add(ctx context.Context, uids ...suid.UID) error
 
 	// Del deletes UIDs from sync set
-	Del(uid ...UID) error
+	Del(ctx context.Context, uids ...suid.UID) error
 
 	// Manifest gets a manifest that needs to be synchronized according to the UID
-	Manifest(uid UID) (Manifest, error)
+	Manifest(ctx context.Context, uid suid.UID) (*suid.AssembleManifest, error)
 
 	// Data gets the data items to be synchronized according to the manifest
-	Data(Manifest) (values []Item, err error)
+	Data(ctx context.Context, manifest *suid.AssembleManifest) ([]Item, error)
 }
 
-// Item defines the data item
-type Item struct {
-	UID   UID
-	Value interface{}
+// DataSet defines the data set operations
+type DataSet interface {
+	// SetState sets the latest state of the dataset
+	SetState(ctx context.Context, uid suid.UID) error
+
+	// State gets the latest state of the dataset
+	State(ctx context.Context) suid.UID
+
+	// Get gets data according to UID
+	Get(ctx context.Context, uid suid.UID) (*Item, error)
+
+	// Add adds data items
+	Add(ctx context.Context, items ...Item) error
+
+	// Del deletes data according to UIDs
+	Del(ctx context.Context, uids ...suid.UID) error
+
+	// SyncManifest syncs the manifest that needs to be executed
+	SyncManifest(ctx context.Context, manifest *suid.AssembleManifest)
+
+	// Sync syncs the data according to manifest and items
+	Sync(ctx context.Context, items []Item, callback ItemCallbackFunc) error
+
+	// SyncAndDelete syncs and deletes the data according to manifest and items
+	SyncAndDelete(ctx context.Context, items []Item, callback ItemCallbackFunc) error
 }
 
-func New() Interface {
-	return nil
+type ItemCallbackFunc func(context.Context, Item) error
+
+func buildName(ss ...string) string {
+	nameSet := make([]string, 0, len(ss))
+	for _, s := range ss {
+		current := strings.TrimSpace(s)
+		if current == "" {
+			continue
+		}
+		nameSet = append(nameSet, current)
+	}
+	return strings.Join(nameSet, "_")
 }
