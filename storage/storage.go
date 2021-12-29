@@ -27,8 +27,11 @@ type Interface interface {
 	// Del deletes key/value pairs according to the specified key in current space
 	Del(ctx context.Context, space, key string) error
 
-	// Iterator returns a storage iterator
-	Iterator() Iterator
+	// Clear clears all data in the specified space
+	Clear(ctx context.Context, space string) error
+
+	// Iterator returns a storage iterator according to the space
+	Iterator(ctx context.Context, space string) Iterator
 }
 
 // Iterator defines a data iterator interface

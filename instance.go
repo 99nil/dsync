@@ -14,7 +14,13 @@
 
 package dsync
 
-import "github.com/99nil/dsync/storage"
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/99nil/dsync/storage"
+)
 
 func New(opts ...Option) Interface {
 	ins := newInstance(opts...)
@@ -56,4 +62,24 @@ func (i *instance) DataSet() DataSet {
 
 func (i *instance) Syncer(name string) Synchronizer {
 	return newSyncer(i.name, name, i.storage)
+}
+
+func (i *instance) Clear(ctx context.Context) error {
+	var str string
+	if err := i.storage.Clear(ctx, buildName(spaceDatasetPrefix, i.name)); err != nil {
+		str += fmt.Sprintf("clear dataset failed: %v\n", err)
+	}
+	if err := i.storage.Clear(ctx, buildName(spaceSyncerPrefix, i.name)); err != nil {
+		str += fmt.Sprintf("clear syncer failed: %v\n", err)
+	}
+	if err := i.storage.Clear(ctx, buildName(spaceRelatePrefix, i.name)); err != nil {
+		str += fmt.Sprintf("clear relate failed: %v\n", err)
+	}
+	if err := i.storage.Clear(ctx, buildName(spaceTmpPrefix, i.name)); err != nil {
+		str += fmt.Sprintf("clear tmp failed: %v\n", err)
+	}
+	if len(str) > 0 {
+		return errors.New(str)
+	}
+	return nil
 }

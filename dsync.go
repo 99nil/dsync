@@ -25,6 +25,13 @@ const prefix = "dsync"
 
 const keyState = "dsync_state"
 
+var (
+	spaceDatasetPrefix = buildName(prefix, "dataset")
+	spaceSyncerPrefix  = buildName(prefix, "syncer")
+	spaceRelatePrefix  = buildName(prefix, "relate")
+	spaceTmpPrefix     = buildName(prefix, "tmp")
+)
+
 // Item defines the data item
 type Item struct {
 	UID   suid.UID
@@ -38,6 +45,9 @@ type Interface interface {
 
 	// Syncer returns a synchronizer with a specified name
 	Syncer(name string) Synchronizer
+
+	// Clear clears all data
+	Clear(ctx context.Context) error
 }
 
 // Synchronizer defines the synchronizer operations

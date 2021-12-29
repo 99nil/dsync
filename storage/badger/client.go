@@ -124,7 +124,12 @@ func (c *Client) Del(_ context.Context, space, key string) error {
 	})
 }
 
-func (c *Client) Iterator() storage.Iterator {
+func (c *Client) Clear(_ context.Context, space string) error {
+	return c.db.DropPrefix([]byte(space))
+}
+
+// TODO
+func (c *Client) Iterator(ctx context.Context, space string) storage.Iterator {
 	iter := NewClientIterator(nil)
 	err := c.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)

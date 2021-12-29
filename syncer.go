@@ -35,9 +35,9 @@ type syncer struct {
 
 func newSyncer(insName string, name string, storage storage.Interface) *syncer {
 	s := &syncer{name: name}
-	s.syncerOperation = newSpaceOperation(buildName(prefix, "syncer", insName), storage)
-	s.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
-	s.customOperation = newSpaceOperation(buildName(prefix, "relate", insName), storage)
+	s.syncerOperation = newSpaceOperation(buildName(spaceSyncerPrefix, insName), storage)
+	s.dataSetOperation = newSpaceOperation(buildName(spaceDatasetPrefix, insName), storage)
+	s.customOperation = newSpaceOperation(buildName(spaceRelatePrefix, insName), storage)
 	return s
 }
 
