@@ -181,6 +181,14 @@ func (ds *dataSet) SyncManifest(ctx context.Context, manifest *suid.AssembleMani
 }
 
 func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallbackFunc) error {
+	return ds.sync(ctx, items, callback, false)
+}
+
+func (ds *dataSet) SyncAndDelete(ctx context.Context, items []Item, callback ItemCallbackFunc) error {
+	return ds.sync(ctx, items, callback, true)
+}
+
+func (ds *dataSet) sync(ctx context.Context, items []Item, callback ItemCallbackFunc, needDelete bool) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -253,6 +261,11 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		// If the deletion fails, no verification is required,
 		// and it can be reclaimed by the GC later.
 		_ = ds.tmpOperation.Del(ctx, uidStr)
+		if needDelete {
+			if err := ds.dataSetOperation.Del(ctx, uidStr); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

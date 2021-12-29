@@ -75,8 +75,11 @@ type DataSet interface {
 	// SyncManifest syncs the manifest that needs to be executed
 	SyncManifest(ctx context.Context, manifest *suid.AssembleManifest)
 
-	// Sync syncs data according to manifest and items
+	// Sync syncs the data according to manifest and items
 	Sync(ctx context.Context, items []Item, callback ItemCallbackFunc) error
+
+	// SyncAndDelete syncs and deletes the data according to manifest and items
+	SyncAndDelete(ctx context.Context, items []Item, callback ItemCallbackFunc) error
 }
 
 type ItemCallbackFunc func(context.Context, Item) error
