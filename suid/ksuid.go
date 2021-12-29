@@ -12,35 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dsync
+package suid
 
-import "github.com/segmentio/ksuid"
+import (
+	"github.com/segmentio/ksuid"
+)
 
-// UID references KSUID implementation.
+// Nil represents a completely empty (invalid) UID
+var Nil KSUID
+
+// KSUID references KSUID implementation.
 // KSUID is for K-Sortable Unique Identifier.
 // It is a kind of globally unique identifier similar to a RFC 4122 UUID,
 // built from the ground-up to be "naturally" sorted by generation timestamp without any special type-aware logic.
 // In short, running a set of KSUIDs through the UNIX sort command will result in a list ordered by generation time.
-type UID = ksuid.KSUID
+type KSUID = ksuid.KSUID
 
-// Manifest defines a list of UIDs to be synchronized
-type Manifest = ksuid.CompressedSet
-
-// Nil represents a completely empty (invalid) UID
-var Nil UID
-
-// NewUID returns a new UID.
-// In the strange case that random bytes can't be read, it will panic.
-func NewUID() UID {
+// NewKSUID generates a new KSUID. In the strange case that random bytes
+// can't be read, it will panic.
+func NewKSUID() KSUID {
 	return ksuid.New()
 }
 
-// BuildUIDFromBytes builds a UID from a string bytes
-func BuildUIDFromBytes(key []byte) (UID, error) {
-	return BuildUID(string(key))
+// CompareKSUID references Compare implementation.
+func CompareKSUID(a KSUID, b KSUID) int {
+	return ksuid.Compare(a, b)
 }
 
-// BuildUID builds a UID from string
-func BuildUID(s string) (UID, error) {
+// ParseKSUID references Parse implementation.
+func ParseKSUID(s string) (KSUID, error) {
 	return ksuid.Parse(s)
 }

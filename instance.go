@@ -22,14 +22,6 @@ func New(opts ...Option) Interface {
 	return ins
 }
 
-func NewCustom(opts ...Option) CustomInterface {
-	ins := newInstance(opts...)
-	name := buildName("custom", ins.name)
-	customIns := &customInstance{name: name, storage: ins.storage}
-	customIns.dataSet = newCustomDataSet(customIns.name, customIns.storage)
-	return customIns
-}
-
 type Option func(i *instance)
 
 func WithStorageOption(storage storage.Interface) Option {
@@ -64,18 +56,4 @@ func (i *instance) DataSet() DataSet {
 
 func (i *instance) Syncer(name string) Synchronizer {
 	return newSyncer(i.name, name, i.storage)
-}
-
-type customInstance struct {
-	name    string
-	storage storage.Interface
-	dataSet CustomDataSet
-}
-
-func (i *customInstance) DataSet() CustomDataSet {
-	return i.dataSet
-}
-
-func (i *customInstance) Syncer(name string) CustomSynchronizer {
-	return newCustomSyncer(i.name, name, i.storage)
 }

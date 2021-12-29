@@ -16,13 +16,11 @@ package dsync
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"sync"
 
 	"github.com/99nil/dsync/storage"
-
-	"github.com/segmentio/ksuid"
+	"github.com/99nil/dsync/suid"
 )
 
 var (
@@ -32,12 +30,13 @@ var (
 
 type dataSet struct {
 	mux      sync.Mutex
-	manifest Manifest
-	state    UID
+	manifest *suid.AssembleManifest
+	state    suid.UID
 
 	defaultOperation OperateInterface
 	dataSetOperation OperateInterface
 	tmpOperation     OperateInterface
+	customOperation  OperateInterface
 }
 
 func newDataSet(insName string, storage storage.Interface) *dataSet {
@@ -45,10 +44,31 @@ func newDataSet(insName string, storage storage.Interface) *dataSet {
 	ds.defaultOperation = newSpaceOperation(buildName(prefix, insName), storage)
 	ds.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
 	ds.tmpOperation = newSpaceOperation(buildName(prefix, "tmp", insName), storage)
+	ds.customOperation = newSpaceOperation(buildName(prefix, "relate", insName), storage)
 	return ds
 }
 
-func (ds *dataSet) SetState(ctx context.Context, uid UID) error {
+func (ds *dataSet) completeUID(ctx context.Context, uids ...suid.UID) ([]suid.UID, error) {
+	set := make([]suid.UID, 0, len(uids))
+	for _, uid := range uids {
+		if uid.IsCustom() {
+			custom := uid.CustomUID()
+			value, err := ds.customOperation.Get(ctx, custom)
+			if err != nil {
+				return nil, err
+			}
+			id, err := suid.ParseKSUID(string(value))
+			if err != nil {
+				return nil, err
+			}
+			uid = suid.NewWithCustom(id, custom)
+		}
+		set = append(set, uid)
+	}
+	return set, nil
+}
+
+func (ds *dataSet) SetState(ctx context.Context, uid suid.UID) error {
 	if err := ds.defaultOperation.Add(ctx, keyState, []byte(uid.String())); err != nil {
 		return err
 	}
@@ -56,8 +76,8 @@ func (ds *dataSet) SetState(ctx context.Context, uid UID) error {
 	return nil
 }
 
-func (ds *dataSet) State(ctx context.Context) UID {
-	if ds.state != Nil {
+func (ds *dataSet) State(ctx context.Context) suid.UID {
+	if !ds.state.IsNil() {
 		return ds.state
 	}
 
@@ -65,17 +85,18 @@ func (ds *dataSet) State(ctx context.Context) UID {
 	if err != nil {
 		return ds.state
 	}
-
-	uid, err := BuildUIDFromBytes(value)
-	if err != nil {
-		return ds.state
-	}
-	ds.state = uid
+	ds.state = value
 	return ds.state
 }
 
-func (ds *dataSet) Get(ctx context.Context, uid UID) (*Item, error) {
-	value, err := ds.dataSetOperation.Get(ctx, uid.String())
+func (ds *dataSet) Get(ctx context.Context, uid suid.UID) (*Item, error) {
+	uids, err := ds.completeUID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	uid = uids[0]
+
+	value, err := ds.dataSetOperation.Get(ctx, uid.KSUID().String())
 	if err != nil {
 		return nil, err
 	}
@@ -91,14 +112,23 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 	}
 
 	state := ds.State(ctx)
+	current := state.KSUID()
 	for _, item := range items {
+		itemCurrent := item.UID.KSUID()
 		// When adding data in batches, the order may not be guaranteed,
 		// so perform the addition first, and then determine the latest state.
-		if err := ds.dataSetOperation.Add(ctx, item.UID.String(), item.Value); err != nil {
+		if err := ds.dataSetOperation.Add(ctx, itemCurrent.String(), item.Value); err != nil {
 			return err
 		}
+		if item.UID.IsCustom() {
+			// Add data first, if the association relationship fails,
+			// the orphaned data will be recovered by the GC soon
+			if err := ds.customOperation.Add(ctx, item.UID.CustomUID(), []byte(itemCurrent.String())); err != nil {
+				return err
+			}
+		}
 
-		if ksuid.Compare(state, item.UID) > -1 {
+		if suid.CompareKSUID(current, itemCurrent) > -1 {
 			continue
 		}
 		if err := ds.SetState(ctx, item.UID); err != nil {
@@ -108,34 +138,44 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 	return nil
 }
 
-func (ds *dataSet) Del(ctx context.Context, uids ...UID) error {
+func (ds *dataSet) Del(ctx context.Context, uids ...suid.UID) error {
+	if len(uids) == 0 {
+		return nil
+	}
+	uids, err := ds.completeUID(ctx, uids...)
+	if err != nil {
+		return err
+	}
+
 	for _, uid := range uids {
-		if err := ds.dataSetOperation.Del(ctx, uid.String()); err != nil {
+		if err := ds.dataSetOperation.Del(ctx, uid.KSUID().String()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (ds *dataSet) SyncManifest(ctx context.Context, manifest Manifest) {
+func (ds *dataSet) SyncManifest(ctx context.Context, manifest *suid.AssembleManifest) {
 	ds.mux.Lock()
 	defer ds.mux.Unlock()
 
 	state := ds.State(ctx)
-	if state != Nil {
+	if !state.IsNil() {
 		var (
-			set    []UID
+			set    []suid.UID
 			exists bool
 		)
+		current := state.KSUID()
 		for iter := manifest.Iter(); iter.Next(); {
-			if iter.KSUID == state {
+			if iter.KSUID == current {
 				exists = true
 			}
 			if exists {
-				set = append(set, iter.KSUID)
+				set = append(set, manifest.GetUID(iter.KSUID))
 			}
 		}
-		manifest = ksuid.Compress(set...)
+		manifest = suid.NewManifest()
+		manifest.AppendUID(set...)
 	}
 	ds.manifest = manifest
 }
@@ -145,15 +185,16 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		return nil
 	}
 	state := ds.State(ctx)
+	current := state.KSUID()
 
 	var count int
 	// Store items in tmp space first,
 	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
 	for _, item := range items {
-		if ksuid.Compare(state, item.UID) > -1 {
+		if suid.CompareKSUID(current, item.UID.KSUID()) > -1 {
 			continue
 		}
-		if err := ds.tmpOperation.Add(ctx, item.UID.String(), item.Value); err != nil {
+		if err := ds.tmpOperation.Add(ctx, item.UID.KSUID().String(), item.Value); err != nil {
 			return err
 		}
 		count++
@@ -168,25 +209,25 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 	defer ds.mux.Unlock()
 
 	var match bool
-	for i, iter := 0, ds.manifest.Iter(); iter.Next(); i++ {
+	for iter := ds.manifest.Iter(); iter.Next(); {
 		uid := iter.KSUID
-		current := uid.String()
+		uidStr := uid.String()
 		state := ds.State(ctx)
 
 		// When state is Nil, directly synchronize data
-		if state == Nil {
+		if state.IsNil() {
 			match = true
 		}
 		if !match {
 			// When the corresponding state is found in the manifest,
 			// start synchronization from the next.
-			if state == uid {
+			if state.KSUID() == uid {
 				match = true
 			}
 			continue
 		}
 
-		value, err := ds.tmpOperation.Get(ctx, current)
+		value, err := ds.tmpOperation.Get(ctx, uidStr)
 		if err != nil {
 			return err
 		}
@@ -194,7 +235,10 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 			return ErrDataNotMatch
 		}
 
-		item := Item{UID: uid, Value: value}
+		item := Item{
+			UID:   ds.manifest.GetUID(uid),
+			Value: value,
+		}
 		if err := ds.Add(ctx, item); err != nil {
 			return err
 		}
@@ -207,220 +251,7 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 		// Try to delete the synchronized data in the tmp space.
 		// If the deletion fails, no verification is required,
 		// and it can be reclaimed by the GC later.
-		_ = ds.tmpOperation.Del(ctx, current)
-	}
-	return nil
-}
-
-type customDataSet struct {
-	mux      sync.Mutex
-	manifest Manifest
-	state    UID
-
-	defaultOperation OperateInterface
-	dataSetOperation OperateInterface
-	tmpOperation     OperateInterface
-	customOperation  OperateInterface
-}
-
-func newCustomDataSet(insName string, storage storage.Interface) *customDataSet {
-	ds := new(customDataSet)
-	ds.defaultOperation = newSpaceOperation(buildName(prefix, insName), storage)
-	ds.dataSetOperation = newSpaceOperation(buildName(prefix, "dataset", insName), storage)
-	ds.tmpOperation = newSpaceOperation(buildName(prefix, "tmp", insName), storage)
-	ds.customOperation = newSpaceOperation(buildName(prefix, "relate", insName), storage)
-	return ds
-}
-
-func (ds *customDataSet) getUIDByKey(ctx context.Context, key string) (UID, error) {
-	value, err := ds.customOperation.Get(ctx, key)
-	if err != nil {
-		return Nil, err
-	}
-	return BuildUIDFromBytes(value)
-}
-
-func (ds *customDataSet) SetState(ctx context.Context, uid UID) error {
-	if err := ds.defaultOperation.Add(ctx, keyState, []byte(uid.String())); err != nil {
-		return err
-	}
-	ds.state = uid
-	return nil
-}
-
-func (ds *customDataSet) State(ctx context.Context) UID {
-	if ds.state != Nil {
-		return ds.state
-	}
-
-	value, err := ds.defaultOperation.Get(ctx, keyState)
-	if err != nil {
-		return ds.state
-	}
-
-	uid, err := BuildUIDFromBytes(value)
-	if err != nil {
-		return ds.state
-	}
-	ds.state = uid
-	return ds.state
-}
-
-func (ds *customDataSet) Get(ctx context.Context, key string) (*CustomItem, error) {
-	uid, err := ds.getUIDByKey(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	value, err := ds.dataSetOperation.Get(ctx, uid.String())
-	if err != nil {
-		return nil, err
-	}
-	return &CustomItem{
-		Key:   key,
-		UID:   uid,
-		Value: value,
-	}, nil
-}
-
-func (ds *customDataSet) Add(ctx context.Context, items ...CustomItem) error {
-	if len(items) == 0 {
-		return nil
-	}
-
-	uid := NewUID()
-	state := ds.State(ctx)
-	for _, item := range items {
-		if item.UID == Nil {
-			item.UID = uid
-			uid = uid.Next()
-		}
-
-		// Add data first, if the association relationship fails,
-		// the orphaned data will be recovered by the GC soon
-		if err := ds.dataSetOperation.Add(ctx, item.UID.String(), item.Value); err != nil {
-			return err
-		}
-		if err := ds.customOperation.Add(ctx, item.Key, []byte(item.UID.String())); err != nil {
-			return err
-		}
-
-		if ksuid.Compare(state, item.UID) > -1 {
-			continue
-		}
-		if err := ds.SetState(ctx, item.UID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ds *customDataSet) Del(ctx context.Context, keys ...string) error {
-	for _, key := range keys {
-		uid, err := ds.getUIDByKey(ctx, key)
-		if err != nil {
-			return err
-		}
-		if err := ds.dataSetOperation.Del(ctx, uid.String()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ds *customDataSet) SyncManifest(ctx context.Context, manifest Manifest) {
-	ds.mux.Lock()
-	defer ds.mux.Unlock()
-
-	state := ds.State(ctx)
-	if state != Nil {
-		var (
-			set    []UID
-			exists bool
-		)
-		for iter := manifest.Iter(); iter.Next(); {
-			if iter.KSUID == state {
-				exists = true
-			}
-			if exists {
-				set = append(set, iter.KSUID)
-			}
-		}
-		manifest = ksuid.Compress(set...)
-	}
-	ds.manifest = manifest
-}
-
-func (ds *customDataSet) Sync(ctx context.Context, items []CustomItem, callback CustomItemCallbackFunc) error {
-	if len(items) == 0 {
-		return nil
-	}
-	state := ds.State(ctx)
-
-	var count int
-	// Store items in tmp space first,
-	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
-	for _, item := range items {
-		if ksuid.Compare(state, item.UID) > -1 {
-			continue
-		}
-		if err := ds.tmpOperation.AddData(ctx, item.UID.String(), item); err != nil {
-			return err
-		}
-		count++
-	}
-	if count == 0 {
-		return nil
-	}
-
-	// In order to ensure the consistency of the manifest,
-	// it needs to be locked before this.
-	ds.mux.Lock()
-	defer ds.mux.Unlock()
-
-	var match bool
-	for i, iter := 0, ds.manifest.Iter(); iter.Next(); i++ {
-		uid := iter.KSUID
-		current := uid.String()
-		state := ds.State(ctx)
-
-		// When state is Nil, directly synchronize data
-		if state == Nil {
-			match = true
-		}
-		if !match {
-			// When the corresponding state is found in the manifest,
-			// start synchronization from the next.
-			if state == uid {
-				match = true
-			}
-			continue
-		}
-
-		value, err := ds.tmpOperation.Get(ctx, current)
-		if err != nil {
-			return err
-		}
-		if value == nil {
-			return ErrDataNotMatch
-		}
-		var item CustomItem
-		if err := json.Unmarshal(value, &item); err != nil {
-			return err
-		}
-
-		if err := ds.Add(ctx, item); err != nil {
-			return err
-		}
-		if callback != nil {
-			if err := callback(ctx, item); err != nil {
-				return err
-			}
-		}
-
-		// Try to delete the synchronized data in the tmp space.
-		// If the deletion fails, no verification is required,
-		// and it can be reclaimed by the GC later.
-		_ = ds.tmpOperation.Del(ctx, current)
+		_ = ds.tmpOperation.Del(ctx, uidStr)
 	}
 	return nil
 }
