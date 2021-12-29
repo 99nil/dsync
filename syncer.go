@@ -167,6 +167,7 @@ func (s *syncer) Manifest(ctx context.Context, uid suid.UID) (*suid.AssembleMani
 	}
 	manifest = suid.NewManifest()
 	manifest.AppendUID(set...)
+	manifest.Sort()
 	if err := s.setManifest(ctx, manifest); err != nil {
 		return nil, err
 	}

@@ -41,6 +41,14 @@ type AssembleManifest struct {
 	set map[KSUID]string
 }
 
+func (am *AssembleManifest) getIds() []KSUID {
+	var set []KSUID
+	for iter := am.cs.Iter(); iter.Next(); {
+		set = append(set, iter.KSUID)
+	}
+	return set
+}
+
 func (am *AssembleManifest) Clone() *AssembleManifest {
 	manifest := &AssembleManifest{}
 	manifest.cs = am.cs[:]
@@ -54,11 +62,17 @@ func (am *AssembleManifest) Clone() *AssembleManifest {
 }
 
 func (am *AssembleManifest) Iter() ksuid.CompressedSetIter {
-	manifest := am.cs[:]
+	set := am.getIds()
 	for id := range am.set {
-		manifest = ksuid.AppendCompressed(manifest, id)
+		set = append(set, id)
 	}
+	manifest := ksuid.Compress(set...)
 	return manifest.Iter()
+}
+
+func (am *AssembleManifest) Sort() {
+	set := am.getIds()
+	am.cs = ksuid.Compress(set...)
 }
 
 func (am *AssembleManifest) Append(ids ...KSUID) {
