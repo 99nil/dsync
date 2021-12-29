@@ -65,9 +65,15 @@ func (s *syncer) completeUIDs(ctx context.Context, uids []suid.UID) ([]suid.UID,
 }
 
 func (s *syncer) setManifest(ctx context.Context, manifest *suid.AssembleManifest) error {
-	b, err := manifest.Bytes()
-	if err != nil {
-		return err
+	var (
+		b   []byte
+		err error
+	)
+	if manifest != nil {
+		b, err = manifest.Bytes()
+		if err != nil {
+			return err
+		}
 	}
 	return s.syncerOperation.Add(ctx, s.name, b)
 }

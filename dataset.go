@@ -191,7 +191,8 @@ func (ds *dataSet) Sync(ctx context.Context, items []Item, callback ItemCallback
 	// Store items in tmp space first,
 	// and use items in subsequent synchronization to prevent the sequence of data from affecting synchronization.
 	for _, item := range items {
-		if suid.CompareKSUID(current, item.UID.KSUID()) > -1 {
+		isExpire := suid.CompareKSUID(current, item.UID.KSUID())
+		if isExpire > -1 {
 			continue
 		}
 		if err := ds.tmpOperation.Add(ctx, item.UID.KSUID().String(), item.Value); err != nil {

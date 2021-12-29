@@ -71,7 +71,7 @@ func NewByCustom(id string) UID {
 }
 
 func NewWithCustom(ksuid KSUID, id string) UID {
-	uid := ksuid[:]
+	uid := []byte(ksuid.String())
 	if id == "" {
 		return uid
 	}
