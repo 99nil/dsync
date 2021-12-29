@@ -89,6 +89,9 @@ func (c *Client) Get(_ context.Context, space, key string) ([]byte, error) {
 		fmtKey := append(prefix, key...)
 		item, err := txn.Get(fmtKey)
 		if err != nil {
+			if err == badger.ErrKeyNotFound {
+				return nil
+			}
 			return err
 		}
 		return item.Value(func(v []byte) error {
@@ -102,14 +105,22 @@ func (c *Client) Get(_ context.Context, space, key string) ([]byte, error) {
 func (c *Client) Add(_ context.Context, space, key string, value []byte) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
-		return txn.Set(fmtKey, value)
+		err := txn.Set(fmtKey, value)
+		if err == badger.ErrKeyNotFound {
+			return nil
+		}
+		return err
 	})
 }
 
 func (c *Client) Del(_ context.Context, space, key string) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		fmtKey := append(buildPrefix(space), key...)
-		return txn.Delete(fmtKey)
+		err := txn.Delete(fmtKey)
+		if err == badger.ErrKeyNotFound {
+			return nil
+		}
+		return err
 	})
 }
 
