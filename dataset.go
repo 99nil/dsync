@@ -41,7 +41,7 @@ type dataSet struct {
 
 func newDataSet(insName string, storage storage.Interface) *dataSet {
 	ds := new(dataSet)
-	ds.defaultOperation = newSpaceOperation(buildName(prefix, insName), storage)
+	ds.defaultOperation = newSpaceOperation(buildName(spaceStatePrefix, insName), storage)
 	ds.dataSetOperation = newSpaceOperation(buildName(spaceDatasetPrefix, insName), storage)
 	ds.tmpOperation = newSpaceOperation(buildName(spaceTmpPrefix, insName), storage)
 	ds.customOperation = newSpaceOperation(buildName(spaceRelatePrefix, insName), storage)

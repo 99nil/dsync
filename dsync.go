@@ -26,6 +26,7 @@ const prefix = "dsync"
 const keyState = "dsync_state"
 
 var (
+	spaceStatePrefix   = buildName(prefix, "state")
 	spaceDatasetPrefix = buildName(prefix, "dataset")
 	spaceSyncerPrefix  = buildName(prefix, "syncer")
 	spaceRelatePrefix  = buildName(prefix, "relate")
