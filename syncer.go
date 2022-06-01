@@ -41,7 +41,7 @@ func newSyncer(insName string, name string, storage storage.Interface) *syncer {
 	return s
 }
 
-func (s *syncer) completeUIDs(ctx context.Context, uids []suid.UID) ([]suid.UID, error) {
+func (s *syncer) filterUIDs(ctx context.Context, uids []suid.UID) ([]suid.UID, error) {
 	set := make([]suid.UID, 0, len(uids))
 	for _, uid := range uids {
 		if uid.IsCustom() {
@@ -93,7 +93,7 @@ func (s *syncer) Add(ctx context.Context, uids ...suid.UID) error {
 	if len(uids) == 0 {
 		return nil
 	}
-	uids, err := s.completeUIDs(ctx, uids)
+	uids, err := s.filterUIDs(ctx, uids)
 	if err != nil {
 		return err
 	}

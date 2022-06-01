@@ -61,7 +61,7 @@ func (am *AssembleManifest) Clone() *AssembleManifest {
 	return manifest
 }
 
-func (am *AssembleManifest) Iter() ksuid.CompressedSetIter {
+func (am *AssembleManifest) Iter() CompressedSetIter {
 	set := am.getIds()
 	for id := range am.set {
 		set = append(set, id)

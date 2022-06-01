@@ -67,7 +67,7 @@ func New() UID {
 }
 
 func NewByCustom(id string) UID {
-	return NewWithCustom(NewKSUID(), id)
+	return NewWithCustom(Nil, id)
 }
 
 func NewWithCustom(ksuid KSUID, id string) UID {

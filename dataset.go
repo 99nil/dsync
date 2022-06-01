@@ -115,6 +115,10 @@ func (ds *dataSet) Add(ctx context.Context, items ...Item) error {
 	current := state.KSUID()
 	for _, item := range items {
 		itemCurrent := item.UID.KSUID()
+		isCustom := item.UID.IsCustom()
+		if isCustom && itemCurrent.IsNil() {
+			itemCurrent = suid.NewKSUID()
+		}
 		// When adding data in batches, the order may not be guaranteed,
 		// so perform the addition first, and then determine the latest state.
 		if err := ds.dataSetOperation.Add(ctx, itemCurrent.String(), item.Value); err != nil {

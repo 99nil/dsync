@@ -28,6 +28,11 @@ var Nil KSUID
 // In short, running a set of KSUIDs through the UNIX sort command will result in a list ordered by generation time.
 type KSUID = ksuid.KSUID
 
+// CompressedSetIter references CompressedSetIter implementation.
+// CompressedSetIter is an iterator type returned by Set.Iter to produce the
+// list of KSUIDs stored in a set.
+type CompressedSetIter = ksuid.CompressedSetIter
+
 // NewKSUID generates a new KSUID. In the strange case that random bytes
 // can't be read, it will panic.
 func NewKSUID() KSUID {
